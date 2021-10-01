@@ -25,7 +25,7 @@ static bool debug_nn = false; // Set this to true to see e.g. features generated
 const uint8_t button_1 = 2;
 const uint8_t button_2 = 3;
 const uint8_t button_3 = 4;
-//const uint8_t button_4 = 5;
+const uint8_t button_4 = 5;
 uint8_t num_button = 0; // 0 represents none
 bool button_pressed = false;
 
@@ -44,7 +44,7 @@ void setup() {
     pinMode(button_1, INPUT);
     pinMode(button_2, INPUT);
     pinMode(button_3, INPUT);
-    //pinMode(button_4, INPUT);
+    pinMode(button_4, INPUT);
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(LEDR, OUTPUT);
     pinMode(LEDG, OUTPUT);
@@ -101,6 +101,11 @@ void init_network_model() {
  * @brief      Arduino main function. Runs the inferencing loop.
  */
 void loop() {
+    digitalWrite(LEDR, HIGH);           // OFF
+    digitalWrite(LEDG, HIGH);           // OFF
+    digitalWrite(LEDB, HIGH);           // OFF
+    digitalWrite(LED_BUILTIN, HIGH);    // ON
+
     if (digitalRead(button_1) == HIGH && (button_pressed == false || num_button == 1)) {
         digitalWrite(LEDR, LOW);  //  ON
         num_button = 1;
@@ -116,19 +121,19 @@ void loop() {
         num_button = 3;
         button_pressed = true;    
     }
-    //else if (digitalRead(button_4) == HIGH && (button_pressed == false || num_button == 4)) {
-    //    digitalWrite(LEDR, LOW);  //  ON
-    //    digitalWrite(LEDG, LOW);  //  ON
-    //    digitalWrite(LEDB, LOW);  //  ON
-    //    num_button = 4;
-    //    button_pressed = true;    
-    //} 
-    else if (button_pressed == true) {
-        digitalWrite(LEDR, HIGH);           // OFF
-        digitalWrite(LEDG, HIGH);           // OFF
-        digitalWrite(LEDB, HIGH);           // OFF
-        digitalWrite(LED_BUILTIN, HIGH);    // ON   
+    else if (digitalRead(button_4) == HIGH && (button_pressed == false || num_button == 4)) {
+        digitalWrite(LEDR, LOW);  //  ON
+        digitalWrite(LEDG, LOW);  //  ON
+        digitalWrite(LEDB, LOW);  //  ON
 
+        Serial.println("start_fl");
+
+        // Debounce
+        while(digitalRead(button_1) == HIGH) {}
+        delay(200);
+    } 
+    
+    if (button_pressed == true) {
         Serial.println("Recording...");
         bool m = microphone_inference_record();
         if (!m) {
@@ -172,15 +177,22 @@ void loop() {
         //    }
         }
         Serial.print("\n");
+        Serial.print("Error: ");
+        ei_printf_float(myNetwork.get_error());
+        Serial.print("\n");
+
+
 
         // Info to plot & graph!
         Serial.println("graph");
-        Serial.println(num_epochs, 10);
+        Serial.println(num_epochs, DEC);
+        
         float error = myNetwork.get_error();
-        //char* myError = (char*) &error;
-        //Serial.write(myError, sizeof(float));
-        Serial.println(error, 10);
-        Serial.println(num_button, 10);
+        char* myError = (char*) &error;
+        Serial.write(myError, sizeof(float));
+        // ei_printf("%.3f", 0.123456);
+        
+        Serial.println(num_button, DEC);
 
         // make it blink
         //if (num_button == 4 && num_button_output != 0) {
@@ -199,7 +211,6 @@ void loop() {
         button_pressed = false;
     }
     else {
-        
         if (Serial.read() == '>') { // s -> FEDERATED LEARNING
             /***********************
              * Federate Learning
@@ -210,7 +221,7 @@ void loop() {
             if (Serial.read() == 's') {
                 Serial.println("start");
                 Serial.println(num_epochs);
-                num_epochs = 0;
+                // num_epochs = 0; Commented by Nil, why 0?
                 // Serial.println(HiddenNodes);
 
                 /*******
@@ -252,8 +263,6 @@ void loop() {
                         // delay(1);
                     }
                 }
-                
-
             }
             /***********************
              * END - Federate Learning

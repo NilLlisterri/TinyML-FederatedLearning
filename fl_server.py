@@ -5,6 +5,8 @@ import struct
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import msvcrt
+import threading
 
 
 def print_until_keyword(keyword, arduino):
@@ -103,37 +105,55 @@ for d in devices:
 devices_connected = devices
 
 graph = [] # Modified to graph
+
+
+#lines = {};
+#def listenDevice(device):
+#    msg = device.readline().decode()
+#    if (len(msg) > 0):
+#        lines[device.port].append(msg);
+
+#for d in devices:
+#    lines[d.port] = [];
+
+
+
+
+
 ################
 # Infinite loop
 ################
 while True:
 
-    federated_learning_interval = 10
-    federated_learning_interval = 100000000 # Modified to graph
+    #federated_learning_interval = 10
+    #federated_learning_interval = 100000000 # Modified to graph
 
     for d in devices:
-        d.timeout = 0
-        # d.timeout = None # Modified to graph
+        #thread = threading.Thread(target=read_from_port, args=(serial_port,))
+        #thread.start()
+        # d.timeout = 0.1
+        d.timeout = None # Modified to graph
 
-    countdown_print = [20,15,10, 5, 4, 3, 2, 1] 
+    #countdown_print = [20,15,10, 5, 4, 3, 2, 1] 
     ini_time = time.time()
 
     while True:
+        start_fl = False
         for d_index, d in enumerate(devices):
             msg = d.readline().decode()
             if (len(msg) > 0):
-                print(f'({d.port}):', msg, end='')
+                print(f'({d.port}):', msg, end="")
                 # Modified to graph
                 if msg[:-2] == 'graph':
                     ne = d.readline()[:-2];
-                    print("ne: ", ne);
                     n_epooch = int(ne)
 
-                    #n_error = d.read(4)
-                    #[n_error] = struct.unpack('f', n_error)
-                    err = d.readline()[:-2]
-                    print("ERr: ", err)
-                    n_error = float(err)
+                    n_error = d.read(4)
+                    [n_error] = struct.unpack('f', n_error)
+                    #print("Err parsed: ", n_error)
+                    #err = d.readline()[:-2]
+                    #print("ERr: ", err)
+                    #n_error = float(1)
 
                     nb = d.readline()[:-2]
                     #print("Nb: ", nb)
@@ -141,14 +161,19 @@ while True:
                     graph.append([n_epooch, n_error, d_index])
 
                     plot_graph(graph)
-                    print(graph)
+                    #print(graph)
 
-        countdown = federated_learning_interval - int(time.time() - ini_time)
-        if countdown <= 0:
+                elif msg[:-2] == 'start_fl':
+                    start_fl = True
+                    
+        #countdown = federated_learning_interval - int(time.time() - ini_time)
+        #if countdown <= 0:
+        #    break
+        #elif countdown in countdown_print:
+        if start_fl:
             break
-        elif countdown in countdown_print:
-            print(f'Starting FL in {countdown} seconds')
-            countdown_print.remove(countdown)
+            #print(f'Starting FL in {countdown} seconds')
+            # countdown_print.remove(countdown)
 
 
     print('Starting Federated Learning')
