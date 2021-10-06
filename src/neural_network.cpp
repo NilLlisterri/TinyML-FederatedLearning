@@ -5,11 +5,10 @@
 #include "neural_network.h"
 #include <math.h>
 
-
-NeuralNetwork::NeuralNetwork() {
-
+NeuralNetwork::NeuralNetwork(float LearningRate, float Momentum) {
+    this->LearningRate = LearningRate;
+    this->Momentum = Momentum;
 }
-
 
 
 void NeuralNetwork::initWeights() {
@@ -30,8 +29,6 @@ void NeuralNetwork::initWeights() {
         }
     }
 }
-
-
 
 
 void NeuralNetwork::forward(const float Input[]){
