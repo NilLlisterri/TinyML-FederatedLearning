@@ -7,7 +7,42 @@ import numpy as np
 import matplotlib.pyplot as plt
 import threading
 import time
+import json
+import os
+import random
 
+random.seed(12345)
+np.random.seed(12345)
+
+samples_per_device = 120 # Amount of samples of each word to send to each device
+batch_size = 10 # Must be even, hsa to be split into 2 types of samples
+iid = True
+
+
+size_hidden_nodes = 25
+size_hidden_layer = (650+1)*size_hidden_nodes
+size_output_layer = (size_hidden_nodes+1)*3
+hidden_layer = np.random.uniform(-0.5,0.5, size_hidden_layer).astype('float32')
+output_layer = np.random.uniform(-0.5, 0.5, size_output_layer).astype('float32')
+momentum = 0.9
+learningRate= 0.6
+pauseListen = False # So there are no threads reading the serial input at the same time
+
+montserrat_files = [file for file in os.listdir("datasets/mountains") if file.startswith("montserrat")]
+pedraforca_files = [file for file in os.listdir("datasets/mountains") if file.startswith("pedraforca")]
+vermell_files = [file for file in os.listdir("datasets/colors") if file.startswith("vermell")]
+verd_files = [file for file in os.listdir("datasets/colors") if file.startswith("verd")]
+blau_files = [file for file in os.listdir("datasets/colors") if file.startswith("blau")]
+
+graph = []
+repaint_graph = True
+
+random.shuffle(montserrat_files)
+random.shuffle(pedraforca_files)
+mountains = list(sum(zip(montserrat_files, pedraforca_files), ()))
+# random.shuffle(vermell_files)
+# random.shuffle(verd_files)
+# random.shuffle(blau_files)
 
 def print_until_keyword(keyword, arduino):
     while True: 
@@ -17,23 +52,120 @@ def print_until_keyword(keyword, arduino):
         else:
             print(f'({arduino.port}):',msg, end='')
 
+def init_network(hidden_layer, output_layer, device, deviceIndex):
+    device.reset_input_buffer()
+    device.write(b's')
+    print_until_keyword('start', device)
+    print(f"Sending model to {device.port}")
 
-def init_network(hidden_layer, output_layer, arduino):
-    arduino.reset_input_buffer()
-    arduino.write(b's')
-    print_until_keyword('start', arduino)
+    device.write(struct.pack('f', learningRate))
+    device.write(struct.pack('f', momentum))
+
     for i in range(len(hidden_layer)):
-        arduino.read() # wait until confirmation of float received
+        device.read() # wait until confirmation of float received
         float_num = hidden_layer[i]
         data = struct.pack('f', float_num)
-        arduino.write(data)
+        device.write(data)
     
     for i in range(len(output_layer)):
-        arduino.read() # wait until confirmation of float received
+        device.read() # wait until confirmation of float received
         float_num = output_layer[i]
         data = struct.pack('f', float_num)
-        arduino.write(data)
+        device.write(data)
 
+    print(f"Model sent to {device.port}")
+    modelReceivedConfirmation = device.readline().decode()
+    # print(f"Model received confirmation: ", modelReceivedConfirmation)
+    
+# Batch size: The amount of samples to send
+def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
+    global montserrat_files, pedraforca_files, mountains
+
+    # each_sample_amt = int(batch_size/2)
+
+    start = (deviceIndex*samples_per_device) + (batch_index * batch_size)
+    end = (deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size
+
+    print(f"[{device.port}] Sending samples from {start} to {end}")
+
+    files = mountains[start:end]
+    for i, filename in enumerate(files):
+        if (filename.startswith("montserrat")):
+            num_button = 1
+        elif (filename.startswith("pedraforca")):
+            num_button = 2
+        else:
+            exit("Unknown button for sample")
+        print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
+        sendSample(device, 'datasets/mountains/'+filename, num_button, deviceIndex)
+
+def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
+    global montserrat_files, pedraforca_files, vermell_files, verd_files, blau_files
+
+    start = (deviceIndex*samples_per_device) + (batch_index * batch_size)
+    end = (deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size
+
+    dir = 'datasets/' # TMP fix
+    if (deviceIndex == 0):
+        files = vermell_files[start:end]
+        num_button = 1
+        dir = 'colors'
+    elif  (deviceIndex == 1):
+        files = montserrat_files[start:end]
+        num_button = 2
+        dir = 'mountains'
+    elif  (deviceIndex == 2):
+        files = pedraforca_files[start:end]
+        num_button = 3
+        dir = 'mountains'
+    else:
+        exit("Exceeded device index")
+
+    for i, filename in enumerate(files):
+        print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
+        sendSample(device, f"datasets/{dir}/{filename}", num_button, deviceIndex)
+    
+
+def sendSample(device, samplePath, num_button, deviceIndex):
+    with open(samplePath) as f:
+        data = json.load(f)
+        device.write(b't')
+        startConfirmation = device.readline().decode()
+        # print(f"[{device.port}] Train start confirmation:", startConfirmation)
+
+        device.write(struct.pack('B', num_button))
+        device.readline().decode() # Button confirmation
+
+        for i, value in enumerate(data['payload']['values']):
+            device.write(struct.pack('h', value))
+
+        print(f"[{device.port}] Sample received confirmation:", device.readline().decode())
+
+        # print(f"Fordward millis received: ", device.readline().decode())
+        # print(f"Backward millis received: ", device.readline().decode())
+        device.readline().decode() # Accept 'graph' command
+        error = read_graph(device, deviceIndex)
+        if (error > 0.5):
+            print(f"[{device.port}] Sample {samplePath} generated an error of {error}")
+
+def read_graph(device, deviceIndex):
+    global repaint_graph
+
+    outputs = device.readline().decode()
+    # print(f"Outputs: ", outputs)
+
+    error = device.readline().decode()
+    # print(f"Error: ", error)
+
+    ne = device.readline()[:-2]
+    n_epooch = int(ne)
+
+    n_error = device.read(4)
+    [n_error] = struct.unpack('f', n_error)
+    nb = device.readline()[:-2]
+    graph.append([n_epooch, n_error, deviceIndex])
+    repaint_graph = True
+    return n_error
 
 def read_number(msg):
     while True:
@@ -42,7 +174,6 @@ def read_number(msg):
             return int(input(msg))
         except:
             print("ERROR: Not a number")
-
 
 def read_port(msg):
     while True:
@@ -53,26 +184,33 @@ def read_port(msg):
         except:
             print(f"ERROR: Wrong port connection ({port})")
 
+def plot_graph():
+    global graph, repaint_graph, devices
 
-def plot_graph(graph_data):
-    colors = ['r', 'g', 'b', 'y', 'p']
-    devices =  [x[2] for x in graph_data]
-    for device_index in devices:
-        epoch = [x[0] for x in graph_data if x[2] == device_index]
-        error = [x[1] for x in graph_data if x[2] == device_index]
+    if (repaint_graph):
+        colors = ['r', 'g', 'b', 'y']
+        markers = ['-', '--', ':', '-.']
+        #devices =  [x[2] for x in graph]        
+        for device_index, device in enumerate(devices):
+            epoch = [x[0] for x in graph if x[2] == device_index]
+            error = [x[1] for x in graph if x[2] == device_index]
+        
+            plt.plot(error, colors[device_index] + markers[device_index], label=f"Device {device_index}")
+
+        plt.legend()
+        plt.xlim(left=0)
+        plt.ylim(bottom=0, top=0.7)
+        plt.ylabel('Loss') # or Error
+        plt.xlabel('Epoch')
+        # plt.axes().set_ylim([0, 0.6])
+        # plt.xlim(bottom=0)
+        # plt.autoscale()
+        repaint_graph = False
+
+    plt.pause(2)
+
     
-        plt.plot(error, colors[device_index], label=device_index)
-    plt.xlim(xmin=0.0) 
-    plt.ylim(ymin=0.0)
-    plt.ylabel('Loss') # or Error
-    plt.xlabel('Epoch')
-   
-    plt.show()
-    plt.autoscale()
-    plt.pause(0.1)
 
-
-pauseListen = False # So there are no threads reading the serial input at the same time
 def listenDevice(device, deviceIndex):
     global pauseListen, graph
     while True:
@@ -86,20 +224,13 @@ def listenDevice(device, deviceIndex):
             print(f'({device.port}):', msg, end="")
             # Modified to graph
             if msg[:-2] == 'graph':
-                ne = device.readline()[:-2];
-                n_epooch = int(ne)
-
-                n_error = device.read(4)
-                [n_error] = struct.unpack('f', n_error)
-                nb = device.readline()[:-2]
-                graph.append([n_epooch, n_error, deviceIndex])
+                read_graph(device, deviceIndex)
 
             elif msg[:-2] == 'start_fl':
                 startFL()
 
-
 def getDevices():
-    global devices
+    global devices, devices_connected
     num_devices = read_number("Number of devices: ")
 
     available_ports = comports()
@@ -108,9 +239,9 @@ def getDevices():
         print(available_port)
 
     devices = [read_port(f"Port device_{i+1}: ") for i in range(num_devices)]
+    devices_connected = devices
 
-
-def getModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
+def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
     global size_hidden_layer, size_output_layer
     d.reset_input_buffer()
     d.reset_output_buffer()
@@ -169,40 +300,6 @@ def sendModel(d, hidden_layer, output_layer):
 
     print(f'Model sent to {d.port} ({time.time()-ini_time} seconds)')
 
-getDevices()
-
-graph = []
-size_hidden_nodes = 20
-size_hidden_layer = (650+1)*size_hidden_nodes
-size_output_layer = (size_hidden_nodes+1)*3
-
-np.random.seed(12345)
-hidden_layer = np.random.uniform(-0.5,0.5, size_hidden_layer).astype('float32')
-output_layer = np.random.uniform(-0.5, 0.5, size_output_layer).astype('float32')
-
-# To load a Pre-trained model
-# hidden_layer = np.load("./hidden_montserrat.npy")
-# output_layer = np.load("./output_montserrat.npy")
-
-
-# Send the blank model to all the devices
-threads = []
-for d in devices:
-    thread = threading.Thread(target=init_network, args=(hidden_layer, output_layer, d))
-    thread.daemon = True
-    thread.start()
-    threads.append(thread)
-for thread in threads: thread.join() # Wait for all the threads to end
-
-# Listen their updates
-for i, d in enumerate(devices):
-    thread = threading.Thread(target=listenDevice, args=(d, i))
-    thread.daemon = True
-    thread.start()
-
-devices_connected = devices
-
-
 def startFL():
     global devices_connected, hidden_layer, output_layer, pauseListen
 
@@ -220,7 +317,7 @@ def startFL():
     ##################
     threads = []
     for i, d in enumerate(devices):
-        thread = threading.Thread(target=getModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
+        thread = threading.Thread(target=FlGetModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
         thread.daemon = True
         thread.start()
         threads.append(thread)
@@ -256,8 +353,68 @@ def startFL():
 
     pauseListen = False
 
+
+
+getDevices()
+
+# To load a Pre-trained model
+# hidden_layer = np.load("./hidden_montserrat.npy")
+# output_layer = np.load("./output_montserrat.npy")
+
+
+# Send the blank model to all the devices
+threads = []
+for i, d in enumerate(devices):
+    thread = threading.Thread(target=init_network, args=(hidden_layer, output_layer, d, i))
+    thread.daemon = True
+    thread.start()
+    threads.append(thread)
+for thread in threads: thread.join() # Wait for all the threads to end
+
+ini_time = time.time()
+# Train the device
+for batch in range(int(samples_per_device/batch_size)):
+    for deviceIndex, device in enumerate(devices):
+        if (iid):
+            thread = threading.Thread(target=sendSamplesIID, args=(device, deviceIndex, batch_size, batch))
+        else:
+            thread = threading.Thread(target=sendSamplesNonIID, args=(device, deviceIndex, batch_size, batch))
+        thread.daemon = True
+        thread.start()
+        threads.append(thread)
+    for thread in threads: thread.join() # Wait for all the threads to end
+    startFL()
+
+train_time = time.time()-ini_time
+print(f'Trained in ({train_time} seconds)')
+
+# Listen their updates
+for i, d in enumerate(devices):
+    thread = threading.Thread(target=listenDevice, args=(d, i))
+    thread.daemon = True
+    thread.start()
+
+
 plt.ion()
+# plt.title(f"Loss vs Epoch")
 plt.show()
+# font_sm = 14
+# font_md = 16
+# font_xl = 18
+# plt.rc('font', size=font_sm)          # controls default text sizes
+# plt.rc('axes', titlesize=font_sm)     # fontsize of the axes title
+# plt.rc('axes', labelsize=font_md)     # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=font_sm)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=font_sm)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=font_sm)    # legend fontsize
+# plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
+
+plot_graph()
+figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-iid{int(iid)}.eps"
+# plt.savefig(figname, format='eps')
+print(f"Generated {figname}")
 while True:
-    plot_graph(graph)
-    time.sleep(0.5)
+    #if (repaint_graph): 
+    plot_graph()
+        #repaint_graph = False
+    # time.sleep(0.1)

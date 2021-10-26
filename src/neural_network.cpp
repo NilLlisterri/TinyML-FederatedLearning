@@ -5,11 +5,10 @@
 #include "neural_network.h"
 #include <math.h>
 
-NeuralNetwork::NeuralNetwork(float LearningRate, float Momentum) {
+void NeuralNetwork::initialize(float LearningRate, float Momentum) {
     this->LearningRate = LearningRate;
     this->Momentum = Momentum;
 }
-
 
 void NeuralNetwork::initWeights() {
     

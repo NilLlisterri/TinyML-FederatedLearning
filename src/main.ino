@@ -4,6 +4,7 @@
 // If your target is limited in memory remove this macro to save 10K RAM
 #define EIDSP_QUANTIZE_FILTERBANK   0
 
+
 /* Includes ---------------------------------------------------------------- */
 #include <PDM.h>
 #include <training_kws_inference.h>
@@ -11,7 +12,7 @@
 
 /** Audio buffers, pointers and selectors */
 typedef struct {
-    int16_t *buffer;
+    int16_t buffer[EI_CLASSIFIER_RAW_SAMPLE_COUNT];
     uint8_t buf_ready;
     uint32_t buf_count;
     uint32_t n_samples;
@@ -26,14 +27,15 @@ const uint8_t button_1 = 2;
 const uint8_t button_2 = 3;
 const uint8_t button_3 = 4;
 const uint8_t button_4 = 5;
-uint8_t num_button = 0; // 0 represents none
+//uint8_t num_button = 0; // 0 represents none
 bool button_pressed = false;
 
 // Defaults: 0.3, 0.9
-static NeuralNetwork myNetwork(0.2, 0.9);
+static NeuralNetwork myNetwork;
 const float threshold = 0.6;
 
 uint16_t num_epochs = 0;
+
 
 /**
  * @brief      Arduino setup function
@@ -56,7 +58,7 @@ void setup() {
 
     digitalWrite(LED_BUILTIN, HIGH);
 
-    if (microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT) == false) {
+    if (microphone_setup(EI_CLASSIFIER_RAW_SAMPLE_COUNT) == false) {
         ei_printf("ERR: Failed to setup audio sampling\r\n");
         return;
     }
@@ -69,20 +71,24 @@ void setup() {
 
 
 void init_network_model() {
-    char signal;
+    char startChar;
     do {
-        signal = Serial.read();
+        startChar = Serial.read();
         Serial.println("Waiting for new model...");
-    } while(signal != 's'); // s -> START
+    } while(startChar != 's'); // s -> START
 
     Serial.println("start");
+    float learningRate = readFloat();
+    float momentum = readFloat();
+
+    myNetwork.initialize(learningRate, momentum);
 
     char* myHiddenWeights = (char*) myNetwork.get_HiddenWeights();
     for (uint16_t i = 0; i < (InputNodes+1) * HiddenNodes; ++i) {
         Serial.write('n');
         while(Serial.available() < 4) {}
         for (int n = 0; n < 4; n++) {
-            myHiddenWeights[i*4+n] = Serial.read();
+            myHiddenWeights[i*4] = Serial.read();
         }
     }
 
@@ -98,6 +104,81 @@ void init_network_model() {
     Serial.println("Received new model.");
 }
 
+float readFloat() {
+    byte res[4];
+    while(Serial.available() < 4) {}
+    for (int n = 0; n < 4; n++) {
+        res[n] = Serial.read();
+    }
+    return *(float *)&res;
+}
+
+void train(int nb) {
+    signal_t signal;
+    signal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
+    signal.get_data = &microphone_audio_signal_get_data;
+    ei::matrix_t features_matrix(1, EI_CLASSIFIER_NN_INPUT_FRAME_SIZE);
+
+    // for(int i = 0; i < EI_CLASSIFIER_RAW_SAMPLE_COUNT; i++) {
+    //     Serial.print(inference.buffer[i]);
+    //     Serial.print(",");
+    // }
+    // Serial.println();
+
+    EI_IMPULSE_ERROR r = get_one_second_features(&signal, &features_matrix, debug_nn);
+    if (r != EI_IMPULSE_OK) {
+        ei_printf("ERR: Failed to get features (%d)\n", r);
+        return;
+    }
+
+    // BACKWARD
+    //Serial.println("Start training...");
+    float myTarget[3] = {0};
+    myTarget[nb-1] = 1.f; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
+    //unsigned long ini = millis();
+    myNetwork.backward(features_matrix.buffer, myTarget);
+    //Serial.print("Backward millis: ");
+    //Serial.println(int(millis() - ini));
+    ++num_epochs;
+
+    // FORWARD
+    //ini = millis();
+    myNetwork.forward(features_matrix.buffer);
+    //Serial.print("Forward millis: ");
+    //Serial.println(int(millis() - ini));
+
+    float* myOutput = myNetwork.get_output();
+
+    //uint8_t num_button_output = 0;
+    float max_output = 0.f;
+    // Serial.print("Inference result: ");
+
+
+    // Info to plot & graph!
+    Serial.println("graph");
+
+    // Print outputs
+    for (size_t i = 0; i < 3; i++) {
+        ei_printf_float(myOutput[i]);
+        Serial.print(" ");
+    //    if (myOutput[i] > max_output && myOutput[i] > threshold) {
+    //        num_button_output = i + 1;
+    //    }
+    }
+    Serial.print("\n");
+
+    // Print error
+    ei_printf_float(myNetwork.get_error());
+    Serial.print("\n");
+
+    Serial.println(num_epochs, DEC);
+    float error = myNetwork.get_error();
+    char* myError = (char*) &error;
+    Serial.write(myError, sizeof(float));
+    
+    Serial.println(nb, DEC);
+}
+
 /**
  * @brief      Arduino main function. Runs the inferencing loop.
  */
@@ -106,6 +187,8 @@ void loop() {
     digitalWrite(LEDG, HIGH);           // OFF
     digitalWrite(LEDB, HIGH);           // OFF
     digitalWrite(LED_BUILTIN, HIGH);    // ON
+
+    uint8_t num_button = 0;
 
     if (digitalRead(button_1) == HIGH && (button_pressed == false || num_button == 1)) {
         digitalWrite(LEDR, LOW);  //  ON
@@ -143,57 +226,12 @@ void loop() {
         }
         Serial.println("Recording done");
 
-        signal_t signal;
-        signal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
-        signal.get_data = &microphone_audio_signal_get_data;
-        ei::matrix_t features_matrix(1, EI_CLASSIFIER_NN_INPUT_FRAME_SIZE);
-
-        EI_IMPULSE_ERROR r = get_one_second_features(&signal, &features_matrix, debug_nn);
-        if (r != EI_IMPULSE_OK) {
-            ei_printf("ERR: Failed to get features (%d)\n", r);
-            return;
-        }
-
-        // BACKWARD
-        Serial.println("Start training...");
-        float myTarget[3] = {0};
-        myTarget[num_button-1] = 1.f; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
-        myNetwork.backward(features_matrix.buffer, myTarget);
-        ++num_epochs;
-
-
-        // FORWARD
-        myNetwork.forward(features_matrix.buffer);
-        float* myOutput = myNetwork.get_output();
-
-        //uint8_t num_button_output = 0;
-        float max_output = 0.f;
-        Serial.print("Inference result: ");
-        for (size_t i = 0; i < 3; i++) {
-            ei_printf_float(myOutput[i]);
-            Serial.print(" ");
-        //    if (myOutput[i] > max_output && myOutput[i] > threshold) {
-        //        num_button_output = i + 1;
-        //    }
-        }
-        Serial.print("\n");
-        Serial.print("Error: ");
-        ei_printf_float(myNetwork.get_error());
-        Serial.print("\n");
-
-        // Info to plot & graph!
-        Serial.println("graph");
-        Serial.println(num_epochs, DEC);
-        float error = myNetwork.get_error();
-        char* myError = (char*) &error;
-        Serial.write(myError, sizeof(float));
-        
-        Serial.println(num_button, DEC);
+        train(num_button);
 
         button_pressed = false;
-    }
-    else {
-        if (Serial.read() == '>') { // s -> FEDERATED LEARNING
+    } else {
+        int read = Serial.read();
+        if (read == '>') { // s -> FEDERATED LEARNING
             /***********************
              * Federate Learning
              ***********************/
@@ -244,6 +282,24 @@ void loop() {
             }
 
             digitalWrite(LED_BUILTIN, LOW);    // OFF
+        } else if (read == 't') { // Train with a sample
+            Serial.println("ok");
+
+            while(Serial.available() < 1) {}
+            uint8_t num_button = Serial.read();
+
+            Serial.print("Button "); Serial.println(num_button);
+            
+            byte ref[2];
+            for(int i = 0; i < EI_CLASSIFIER_RAW_SAMPLE_COUNT; i++) {
+                while(Serial.available() < 2) {}
+                Serial.readBytes(ref, 2);
+                inference.buffer[i] = 0;
+                inference.buffer[i] = (ref[1] << 8) | ref[0];
+            }
+            Serial.print("Sample received for button ");
+            Serial.println(num_button);
+            train(num_button);
         }
     }
 }
@@ -283,13 +339,7 @@ static void pdm_data_ready_inference_callback(void) {
 }
 
 
-static bool microphone_inference_start(uint32_t n_samples) {
-    inference.buffer = (int16_t *)malloc(n_samples * sizeof(int16_t));
-
-    if (inference.buffer == NULL) {
-        return false;
-    }
-
+static bool microphone_setup(uint32_t n_samples) {
     inference.buf_count  = 0;
     inference.n_samples  = n_samples;
     inference.buf_ready  = 0;
@@ -307,7 +357,6 @@ static bool microphone_inference_start(uint32_t n_samples) {
     if (!PDM.begin(1, EI_CLASSIFIER_FREQUENCY)) {
         ei_printf("Failed to start PDM!");
         PDM.end();
-        free(inference.buffer);
         return false;
     }
     return true;

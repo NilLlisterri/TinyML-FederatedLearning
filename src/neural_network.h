@@ -11,7 +11,7 @@
 
 static const int PatternCount = 3;
 static const int InputNodes = 650;
-static const int HiddenNodes = 20;
+static const int HiddenNodes = 25;
 static const int OutputNodes = 3;
 static const float InitialWeightMax = 0.5;
 
@@ -19,7 +19,7 @@ static const float InitialWeightMax = 0.5;
 class NeuralNetwork {
     public:
 
-        NeuralNetwork(float LearningRate, float Momentum);
+        void initialize(float LearningRate, float Momentum);
         // ~NeuralNetwork();
 
         void initWeights();
@@ -47,8 +47,8 @@ class NeuralNetwork {
 
        
         float Error;
-        float LearningRate;
-        float Momentum;
+        float LearningRate = 0.3;
+        float Momentum = 0.9;
 };
 
 
