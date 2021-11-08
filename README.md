@@ -12,8 +12,8 @@ Final degree project for the Bachelor's Degree in Computer Science of the [Unive
 4. Start training the devices using the buttons.
     * The 3 buttons on the left are used to train 3 different keywords (to be decided by you!)
     * The board will start recording when the button is pressed & RELEASED (one second).
-    * The fourth buttons is used to test the application, without training the model.
-5. Every 10 seconds there will be a FL iteration to merge the trained models.
+    * The fourth buttons is used to start the Federated Learning process.
 
 ## Authors
 - Marc Monfort
+- Nil Llisterri

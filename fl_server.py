@@ -11,13 +11,12 @@ import json
 import os
 import random
 
-random.seed(12345)
-np.random.seed(12345)
+random.seed(4321)
+np.random.seed(4321)
 
 samples_per_device = 120 # Amount of samples of each word to send to each device
-batch_size = 10 # Must be even, hsa to be split into 2 types of samples
-iid = True
-
+batch_size = 120 # Must be even, hsa to be split into 2 types of samples
+experiment = 'iid' # 'iid', 'no-iid', 'train-test'
 
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
@@ -33,6 +32,8 @@ pedraforca_files = [file for file in os.listdir("datasets/mountains") if file.st
 vermell_files = [file for file in os.listdir("datasets/colors") if file.startswith("vermell")]
 verd_files = [file for file in os.listdir("datasets/colors") if file.startswith("verd")]
 blau_files = [file for file in os.listdir("datasets/colors") if file.startswith("blau")]
+test_montserrat_files = [file for file in os.listdir("datasets/test/") if file.startswith("montserrat")]
+test_pedraforca_files = [file for file in os.listdir("datasets/test") if file.startswith("pedraforca")]
 
 graph = []
 repaint_graph = True
@@ -40,6 +41,7 @@ repaint_graph = True
 random.shuffle(montserrat_files)
 random.shuffle(pedraforca_files)
 mountains = list(sum(zip(montserrat_files, pedraforca_files), ()))
+test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
 # random.shuffle(vermell_files)
 # random.shuffle(verd_files)
 # random.shuffle(blau_files)
@@ -102,8 +104,8 @@ def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
 def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
     global montserrat_files, pedraforca_files, vermell_files, verd_files, blau_files
 
-    start = (deviceIndex*samples_per_device) + (batch_index * batch_size)
-    end = (deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size
+    start = (batch_index * batch_size)
+    end = (batch_index * batch_size) + batch_size
 
     dir = 'datasets/' # TMP fix
     if (deviceIndex == 0):
@@ -124,9 +126,8 @@ def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
     for i, filename in enumerate(files):
         print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
         sendSample(device, f"datasets/{dir}/{filename}", num_button, deviceIndex)
-    
 
-def sendSample(device, samplePath, num_button, deviceIndex):
+def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False):
     with open(samplePath) as f:
         data = json.load(f)
         device.write(b't')
@@ -135,6 +136,9 @@ def sendSample(device, samplePath, num_button, deviceIndex):
 
         device.write(struct.pack('B', num_button))
         device.readline().decode() # Button confirmation
+
+        device.write(struct.pack('B', 1 if only_forward else 0))
+        print(f"Only forward confirmation: {device.readline().decode()}") # Button confirmation
 
         for i, value in enumerate(data['payload']['values']):
             device.write(struct.pack('h', value))
@@ -145,8 +149,27 @@ def sendSample(device, samplePath, num_button, deviceIndex):
         # print(f"Backward millis received: ", device.readline().decode())
         device.readline().decode() # Accept 'graph' command
         error = read_graph(device, deviceIndex)
-        if (error > 0.5):
+        if (error > 0.28):
             print(f"[{device.port}] Sample {samplePath} generated an error of {error}")
+
+def sendTestSamples(device, deviceIndex):
+    global test_mountains
+
+    print(f"[{device.port}] Sending test samples from {0} to {60}")
+
+    start = deviceIndex*40
+    end = (deviceIndex*40) + 40
+
+    files = mountains[start:end]
+    for i, filename in enumerate(files):
+        if (filename.startswith("montserrat")):
+            num_button = 1
+        elif (filename.startswith("pedraforca")):
+            num_button = 2
+        else:
+            exit("Unknown button for sample")
+        print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
+        sendSample(device, 'datasets/mountains/'+filename, num_button, deviceIndex, True)
 
 def read_graph(device, deviceIndex):
     global repaint_graph
@@ -375,10 +398,11 @@ ini_time = time.time()
 # Train the device
 for batch in range(int(samples_per_device/batch_size)):
     for deviceIndex, device in enumerate(devices):
-        if (iid):
+        if experiment == 'iid' or experiment == 'train-test':
             thread = threading.Thread(target=sendSamplesIID, args=(device, deviceIndex, batch_size, batch))
-        else:
+        elif experiment == 'no-iid':
             thread = threading.Thread(target=sendSamplesNonIID, args=(device, deviceIndex, batch_size, batch))
+            
         thread.daemon = True
         thread.start()
         threads.append(thread)
@@ -386,7 +410,16 @@ for batch in range(int(samples_per_device/batch_size)):
     startFL()
 
 train_time = time.time()-ini_time
-print(f'Trained in ({train_time} seconds)')
+# print(f'Trained in ({train_time} seconds)')
+
+if experiment == 'train-test':
+    for deviceIndex, device in enumerate(devices):
+        thread = threading.Thread(target=sendTestSamples, args=(device, deviceIndex))
+        thread.daemon = True
+        thread.start()
+        threads.append(thread)
+    for thread in threads: thread.join() # Wait for all the threads to end
+
 
 # Listen their updates
 for i, d in enumerate(devices):
@@ -398,20 +431,21 @@ for i, d in enumerate(devices):
 plt.ion()
 # plt.title(f"Loss vs Epoch")
 plt.show()
-# font_sm = 14
-# font_md = 16
-# font_xl = 18
-# plt.rc('font', size=font_sm)          # controls default text sizes
-# plt.rc('axes', titlesize=font_sm)     # fontsize of the axes title
-# plt.rc('axes', labelsize=font_md)     # fontsize of the x and y labels
-# plt.rc('xtick', labelsize=font_sm)    # fontsize of the tick labels
-# plt.rc('ytick', labelsize=font_sm)    # fontsize of the tick labels
-# plt.rc('legend', fontsize=font_sm)    # legend fontsize
-# plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
+
+font_sm = 13
+font_md = 16
+font_xl = 18
+plt.rc('font', size=font_sm)          # controls default text sizes
+plt.rc('axes', titlesize=font_sm)     # fontsize of the axes title
+plt.rc('axes', labelsize=font_md)     # fontsize of the x and y labels
+plt.rc('xtick', labelsize=font_sm)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=font_sm)    # fontsize of the tick labels
+plt.rc('legend', fontsize=font_sm)    # legend fontsize
+plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
 
 plot_graph()
-figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-iid{int(iid)}.eps"
-# plt.savefig(figname, format='eps')
+figname = f"newplots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.eps"
+plt.savefig(figname, format='eps')
 print(f"Generated {figname}")
 while True:
     #if (repaint_graph): 

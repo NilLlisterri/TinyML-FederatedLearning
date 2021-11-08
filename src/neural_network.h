@@ -2,9 +2,6 @@
 #define NEURAL_NETWORK
 
 
-
-
-
 /******************************************************************
  * Network Configuration - customized per network 
  ******************************************************************/
@@ -15,7 +12,6 @@ static const int HiddenNodes = 25;
 static const int OutputNodes = 3;
 static const float InitialWeightMax = 0.5;
 
-
 class NeuralNetwork {
     public:
 
@@ -23,8 +19,8 @@ class NeuralNetwork {
         // ~NeuralNetwork();
 
         void initWeights();
-        void forward(const float Input[]);
-        void backward(const float Input[], const float Target[]);
+        float forward(const float Input[], const float Target[]);
+        float backward(const float Input[], const float Target[]);
 
         float* get_output();
 
@@ -45,7 +41,6 @@ class NeuralNetwork {
         float ChangeHiddenWeights[(InputNodes+1) * HiddenNodes] = {};
         float ChangeOutputWeights[(HiddenNodes+1) * OutputNodes] = {};
 
-       
         float Error;
         float LearningRate = 0.3;
         float Momentum = 0.9;

@@ -113,7 +113,7 @@ float readFloat() {
     return *(float *)&res;
 }
 
-void train(int nb) {
+void train(int nb, bool only_forward) {
     signal_t signal;
     signal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
     signal.get_data = &microphone_audio_signal_get_data;
@@ -131,26 +131,29 @@ void train(int nb) {
         return;
     }
 
-    // BACKWARD
-    //Serial.println("Start training...");
+
     float myTarget[3] = {0};
     myTarget[nb-1] = 1.f; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
-    //unsigned long ini = millis();
-    myNetwork.backward(features_matrix.buffer, myTarget);
-    //Serial.print("Backward millis: ");
-    //Serial.println(int(millis() - ini));
-    ++num_epochs;
+
+    float backward_error = 0;
+    if (!only_forward) {
+        // BACKWARD
+        backward_error = myNetwork.backward(features_matrix.buffer, myTarget);
+        ++num_epochs;
+    }
 
     // FORWARD
-    //ini = millis();
-    myNetwork.forward(features_matrix.buffer);
-    //Serial.print("Forward millis: ");
-    //Serial.println(int(millis() - ini));
+    float forward_error = myNetwork.forward(features_matrix.buffer, myTarget);
+
+    float error = forward_error;
+    if (!only_forward) {
+        error = backward_error;
+    }
 
     float* myOutput = myNetwork.get_output();
 
     //uint8_t num_button_output = 0;
-    float max_output = 0.f;
+    //float max_output = 0.f;
     // Serial.print("Inference result: ");
 
 
@@ -168,11 +171,11 @@ void train(int nb) {
     Serial.print("\n");
 
     // Print error
-    ei_printf_float(myNetwork.get_error());
+    ei_printf_float(error);
     Serial.print("\n");
 
     Serial.println(num_epochs, DEC);
-    float error = myNetwork.get_error();
+
     char* myError = (char*) &error;
     Serial.write(myError, sizeof(float));
     
@@ -226,7 +229,7 @@ void loop() {
         }
         Serial.println("Recording done");
 
-        train(num_button);
+        train(num_button, false);
 
         button_pressed = false;
     } else {
@@ -287,8 +290,11 @@ void loop() {
 
             while(Serial.available() < 1) {}
             uint8_t num_button = Serial.read();
-
             Serial.print("Button "); Serial.println(num_button);
+
+            while(Serial.available() < 1) {}
+            bool only_forward = Serial.read() == 1;
+            Serial.print("Only forward "); Serial.println(only_forward);
             
             byte ref[2];
             for(int i = 0; i < EI_CLASSIFIER_RAW_SAMPLE_COUNT; i++) {
@@ -299,7 +305,7 @@ void loop() {
             }
             Serial.print("Sample received for button ");
             Serial.println(num_button);
-            train(num_button);
+            train(num_button, only_forward);
         }
     }
 }
