@@ -193,20 +193,31 @@ void loop() {
 
     uint8_t num_button = 0;
 
+    bool only_forward = false;
+
     if (digitalRead(button_1) == HIGH && (button_pressed == false || num_button == 1)) {
         digitalWrite(LEDR, LOW);  //  ON
         num_button = 1;
         button_pressed = true;
+        
+        while(digitalRead(button_1) == HIGH) {}
+        delay(200);
     }
     else if (digitalRead(button_2) == HIGH && (button_pressed == false || num_button == 2)) {
         digitalWrite(LEDG, LOW);  //  ON
         num_button = 2;
         button_pressed = true;
+
+        while(digitalRead(button_2) == HIGH) {}
+        delay(200);
     }
     else if (digitalRead(button_3) == HIGH && (button_pressed == false || num_button == 3)) {
         digitalWrite(LEDB, LOW);  //  ON
         num_button = 3;
-        button_pressed = true;    
+        button_pressed = true;
+
+        while(digitalRead(button_3) == HIGH) {}
+        delay(200);
     }
     else if (digitalRead(button_4) == HIGH && (button_pressed == false || num_button == 4)) {
         digitalWrite(LEDR, LOW);  //  ON
@@ -214,9 +225,10 @@ void loop() {
         digitalWrite(LEDB, LOW);  //  ON
 
         Serial.println("start_fl");
+        // only_forward = true;
 
         // Debounce
-        while(digitalRead(button_1) == HIGH) {}
+        while(digitalRead(button_4) == HIGH) {}
         delay(200);
     } 
     
@@ -229,7 +241,7 @@ void loop() {
         }
         Serial.println("Recording done");
 
-        train(num_button, false);
+        train(num_button, only_forward);
 
         button_pressed = false;
     } else {

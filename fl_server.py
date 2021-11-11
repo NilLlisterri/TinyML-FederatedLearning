@@ -15,7 +15,7 @@ random.seed(4321)
 np.random.seed(4321)
 
 samples_per_device = 120 # Amount of samples of each word to send to each device
-batch_size = 120 # Must be even, hsa to be split into 2 types of samples
+batch_size = 10 # Must be even, hsa to be split into 2 types of samples
 experiment = 'iid' # 'iid', 'no-iid', 'train-test'
 
 size_hidden_nodes = 25
@@ -356,8 +356,10 @@ def startFL():
         # We can use weights to change the importance of each device
         # example weights = [1, 0.5] -> giving more importance to the first device...
         # is like percentage of importance :  sum(a * weights) / sum(weights)
+        ini_time = time.time() * 1000
         hidden_layer = np.average(devices_hidden_layer, axis=0, weights=devices_num_epochs)
         output_layer = np.average(devices_output_layer, axis=0, weights=devices_num_epochs)
+        print(f'Average millis: {(time.time()*1000)-ini_time} milliseconds)')
 
 
     #################

@@ -12,7 +12,7 @@ Final degree project for the Bachelor's Degree in Computer Science of the [Unive
 4. Start training the devices using the buttons.
     * The 3 buttons on the left are used to train 3 different keywords (to be decided by you!)
     * The board will start recording when the button is pressed & RELEASED (one second).
-    * The fourth buttons is used to start the Federated Learning process.
+    * The fourth button can be used to start the Federated Learning process or to only run the inference without training. It can be configured on the main loop in src/main.ino.
 
 ## Authors
 - Marc Monfort
