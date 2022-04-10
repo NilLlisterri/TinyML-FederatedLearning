@@ -1,0 +1,35 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "TinyML Portenta TFG",
+			"path": "..\\..\\Documents\\PlatformIO\\Projects\\TinyML Portenta TFG"
+		},
+		{
+			"name": "Portenta Dual M4",
+			"path": "..\\..\\Documents\\PlatformIO\\Projects\\Portenta Dual M4"
+		},
+		{
+			"path": "..\\..\\Documents\\PlatformIO\\Projects\\Portenta Dual M7"
+		},
+		{
+			"path": "..\\RPC_m4"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"deque": "cpp",
+			"forward_list": "cpp",
+			"list": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"vector": "cpp",
+			"string_view": "cpp",
+			"initializer_list": "cpp"
+		}
+	}
+}

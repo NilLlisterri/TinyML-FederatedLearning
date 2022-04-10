@@ -10,14 +10,17 @@ import time
 import json
 import os
 import random
+from queue import Queue
 
 random.seed(4321)
 np.random.seed(4321)
 
 samples_per_device = 120 # Amount of samples of each word to send to each device
-batch_size = 10 # Must be even, hsa to be split into 2 types of samples
-experiment = 'iid' # 'iid', 'no-iid', 'train-test'
+batch_size = 120 # Must be even, hsa to be split into 2 types of samples
+experiment = None # 'iid', 'no-iid', 'train-test', None
+use_threads = True
 
+test_samples_amount = 60
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*3
@@ -35,12 +38,25 @@ blau_files = [file for file in os.listdir("datasets/colors") if file.startswith(
 test_montserrat_files = [file for file in os.listdir("datasets/test/") if file.startswith("montserrat")]
 test_pedraforca_files = [file for file in os.listdir("datasets/test") if file.startswith("pedraforca")]
 
-graph = []
-repaint_graph = True
-
 random.shuffle(montserrat_files)
 random.shuffle(pedraforca_files)
+
+# mountains = []
+# for index in range(0, len(montserrat_files), 5):
+#     mountains.append(montserrat_files[index])
+#     mountains.append(montserrat_files[index+1])
+#     mountains.append(montserrat_files[index+2])
+#     mountains.append(montserrat_files[index+3])
+#     mountains.append(montserrat_files[index+4])
+
+#     mountains.append(pedraforca_files[index])
+#     mountains.append(pedraforca_files[index+1])
+#     mountains.append(pedraforca_files[index+2])
+#     mountains.append(pedraforca_files[index+3])
+#     mountains.append(pedraforca_files[index+4])
+
 mountains = list(sum(zip(montserrat_files, pedraforca_files), ()))
+
 test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
 # random.shuffle(vermell_files)
 # random.shuffle(verd_files)
@@ -129,6 +145,7 @@ def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
 
 def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False):
     with open(samplePath) as f:
+        ini_time = time.time() * 1000
         data = json.load(f)
         device.write(b't')
         startConfirmation = device.readline().decode()
@@ -148,34 +165,66 @@ def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False
         # print(f"Fordward millis received: ", device.readline().decode())
         # print(f"Backward millis received: ", device.readline().decode())
         device.readline().decode() # Accept 'graph' command
-        error = read_graph(device, deviceIndex)
+        error, num_button_predicted = read_graph(device, deviceIndex)
         if (error > 0.28):
             print(f"[{device.port}] Sample {samplePath} generated an error of {error}")
+        print(f'Sample sent in: {(time.time()*1000)-ini_time} milliseconds)')
+    
+    print(f"{num_button} - {num_button_predicted}")
+    return error, num_button == num_button_predicted
 
-def sendTestSamples(device, deviceIndex):
+# def sendTestSamples(device, deviceIndex):
+#     global test_mountains
+
+#     print(f"[{device.port}] Sending test samples from {0} to {60}")
+
+#     start = deviceIndex*40
+#     end = (deviceIndex*40) + 40
+
+#     files = mountains[start:end]
+#     for i, filename in enumerate(files):
+#         if (filename.startswith("montserrat")):
+#             num_button = 1
+#         elif (filename.startswith("pedraforca")):
+#             num_button = 2
+#         else:
+#             exit("Unknown button for sample")
+#         print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
+#         sendSample(device, 'datasets/mountains/'+filename, num_button, deviceIndex, True)
+def sendTestSamples(device, deviceIndex, successes_queue):
     global test_mountains
 
-    print(f"[{device.port}] Sending test samples from {0} to {60}")
+    # print(f"[{device.port}] Sending test samples from {0} to {60}")
 
-    start = deviceIndex*40
-    end = (deviceIndex*40) + 40
-
-    files = mountains[start:end]
+    start = deviceIndex*test_samples_amount
+    end = (deviceIndex*test_samples_amount) + test_samples_amount
+   
+    files = test_mountains[start:end]
+   
     for i, filename in enumerate(files):
         if (filename.startswith("montserrat")):
             num_button = 1
         elif (filename.startswith("pedraforca")):
             num_button = 2
+        elif (filename.startswith("vermell")):
+            num_button = 3
         else:
             exit("Unknown button for sample")
-        print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
-        sendSample(device, 'datasets/mountains/'+filename, num_button, deviceIndex, True)
+        
+        error, success = sendSample(device, 'datasets/test/'+filename, num_button, deviceIndex, True)
+        successes_queue.put(success)
 
 def read_graph(device, deviceIndex):
     global repaint_graph
 
-    outputs = device.readline().decode()
+    outputs = device.readline().decode().split()
+    print(f'Ouptuts: {outputs}')
+
+    bpred = outputs.index(max(outputs))+1
+    print(f'Predicted button: {bpred}')
+
     # print(f"Outputs: ", outputs)
+    
 
     error = device.readline().decode()
     # print(f"Error: ", error)
@@ -188,7 +237,7 @@ def read_graph(device, deviceIndex):
     nb = device.readline()[:-2]
     graph.append([n_epooch, n_error, deviceIndex])
     repaint_graph = True
-    return n_error
+    return n_error, outputs.index(max(outputs)) + 1
 
 def read_number(msg):
     while True:
@@ -207,27 +256,41 @@ def read_port(msg):
         except:
             print(f"ERROR: Wrong port connection ({port})")
 
+first_paint = True
+graph = []
+repaint_graph = True
 def plot_graph():
-    global graph, repaint_graph, devices
+    global graph, repaint_graph, devices, first_paint
 
     if (repaint_graph):
         colors = ['r', 'g', 'b', 'y']
         markers = ['-', '--', ':', '-.']
-        #devices =  [x[2] for x in graph]        
+        #devices =  [x[2] for x in graph]
+        epochs = 1
         for device_index, device in enumerate(devices):
             epoch = [x[0] for x in graph if x[2] == device_index]
             error = [x[1] for x in graph if x[2] == device_index]
+
+            epochs = max(len(error), epochs)
         
             plt.plot(error, colors[device_index] + markers[device_index], label=f"Device {device_index}")
 
-        plt.legend()
-        plt.xlim(left=0)
-        plt.ylim(bottom=0, top=0.7)
-        plt.ylabel('Loss') # or Error
-        plt.xlabel('Epoch')
+        if (first_paint):
+            plt.legend()
+            plt.xlim(left=0)
+            plt.ylim(bottom=0, top=0.7)
+            plt.ylabel('Loss') # or Error
+            plt.xlabel('Epoch')
+            first_paint = False
         # plt.axes().set_ylim([0, 0.6])
         # plt.xlim(bottom=0)
-        # plt.autoscale()
+        plt.autoscale(axis='x')
+        #plt.xlim = epochs
+        #plt.xticks(range(0, epochs))
+
+        if (experiment == 'train-test'):
+            plt.axvline(x=samples_per_device)
+
         repaint_graph = False
 
     plt.pause(2)
@@ -238,7 +301,6 @@ def listenDevice(device, deviceIndex):
     global pauseListen, graph
     while True:
         while (pauseListen):
-            print("Paused...")
             time.sleep(0.1)
 
         d.timeout = None
@@ -310,13 +372,13 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
 def sendModel(d, hidden_layer, output_layer):
     ini_time = time.time()
     for i in range(size_hidden_layer): # hidden layer
-        d.read() # wait until confirmatio
+        #d.read() # wait until confirmatio
         float_num = hidden_layer[i]
         data = struct.pack('f', float_num)
         d.write(data)
 
     for i in range(size_output_layer): # output layer
-        d.read() # wait until confirmatio
+        #d.read() # wait until confirmatio
         float_num = output_layer[i]
         data = struct.pack('f', float_num)
         d.write(data)
@@ -340,10 +402,14 @@ def startFL():
     ##################
     threads = []
     for i, d in enumerate(devices):
-        thread = threading.Thread(target=FlGetModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
-        thread.daemon = True
-        thread.start()
-        threads.append(thread)
+        if use_threads:
+            thread = threading.Thread(target=FlGetModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
+        else:
+            FlGetModel(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected)
+ 
     for thread in threads: thread.join() # Wait for all the threads to end
 
     
@@ -369,15 +435,15 @@ def startFL():
     for d in devices_connected:
         print(f'Sending model to {d.port} ...')
 
-        thread = threading.Thread(target=sendModel, args=(d, hidden_layer, output_layer))
-        thread.daemon = True
-        thread.start()
-        threads.append(thread)
+        if use_threads:
+            thread = threading.Thread(target=sendModel, args=(d, hidden_layer, output_layer))
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
+        else:
+            sendModel(d, hidden_layer, output_layer)
     for thread in threads: thread.join() # Wait for all the threads to end
-
-
     pauseListen = False
-
 
 
 getDevices()
@@ -390,44 +456,57 @@ getDevices()
 # Send the blank model to all the devices
 threads = []
 for i, d in enumerate(devices):
-    thread = threading.Thread(target=init_network, args=(hidden_layer, output_layer, d, i))
-    thread.daemon = True
-    thread.start()
-    threads.append(thread)
+    if use_threads:
+        thread = threading.Thread(target=init_network, args=(hidden_layer, output_layer, d, i))
+        thread.daemon = True
+        thread.start()
+        threads.append(thread)
+    else:
+        init_network(hidden_layer, output_layer, d, i)
 for thread in threads: thread.join() # Wait for all the threads to end
 
-ini_time = time.time()
-# Train the device
-for batch in range(int(samples_per_device/batch_size)):
-    for deviceIndex, device in enumerate(devices):
-        if experiment == 'iid' or experiment == 'train-test':
-            thread = threading.Thread(target=sendSamplesIID, args=(device, deviceIndex, batch_size, batch))
-        elif experiment == 'no-iid':
-            thread = threading.Thread(target=sendSamplesNonIID, args=(device, deviceIndex, batch_size, batch))
-            
-        thread.daemon = True
-        thread.start()
-        threads.append(thread)
-    for thread in threads: thread.join() # Wait for all the threads to end
-    startFL()
+if experiment != None:
+    train_ini_time = time.time()
+    # Train the device
+    for batch in range(int(samples_per_device/batch_size)):
+        batch_ini_time = time.time()
+        for deviceIndex, device in enumerate(devices):
+            if experiment == 'iid' or experiment == 'train-test':
+                method = sendSamplesIID            
+            elif experiment == 'no-iid':
+                method = sendSamplesNonIID
 
-train_time = time.time()-ini_time
-# print(f'Trained in ({train_time} seconds)')
+            if use_threads:
+                thread = threading.Thread(target=method, args=(device, deviceIndex, batch_size, batch))
+                thread.daemon = True
+                thread.start()
+                threads.append(thread)
+            else:
+                method(device, deviceIndex, batch_size, batch)
+        for thread in threads: thread.join() # Wait for all the threads to end
+        print(f'Batch time: {time.time() - batch_ini_time} seconds)')
+        fl_ini_time = time.time()
+        startFL()
+        print(f'FL time: {time.time() - fl_ini_time} seconds)')
 
-if experiment == 'train-test':
-    for deviceIndex, device in enumerate(devices):
-        thread = threading.Thread(target=sendTestSamples, args=(device, deviceIndex))
-        thread.daemon = True
-        thread.start()
-        threads.append(thread)
-    for thread in threads: thread.join() # Wait for all the threads to end
+    train_time = time.time()-train_ini_time
+    # print(f'Trained in ({train_time} seconds)')
 
+    if experiment == 'train-test':
+        successes_queue = Queue()
+        for deviceIndex, device in enumerate(devices):
+            if use_threads:
+                thread = threading.Thread(target=sendTestSamples, args=(device, deviceIndex, successes_queue))
+                thread.daemon = True
+                thread.start()
+                threads.append(thread)
+            else:
+                sendTestSamples(device, deviceIndex, successes_queue)
+        for thread in threads: thread.join() # Wait for all the threads to end
 
-# Listen their updates
-for i, d in enumerate(devices):
-    thread = threading.Thread(target=listenDevice, args=(d, i))
-    thread.daemon = True
-    thread.start()
+        test_accuracy = sum(successes_queue.queue)/len(successes_queue.queue)
+        print(f"Testing accuracy: {test_accuracy}")
+        print(f"{test_accuracy}, ", end = '')
 
 
 plt.ion()
@@ -446,9 +525,18 @@ plt.rc('legend', fontsize=font_sm)    # legend fontsize
 plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
 
 plot_graph()
-figname = f"newplots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.eps"
-plt.savefig(figname, format='eps')
-print(f"Generated {figname}")
+
+if experiment != None:
+    figname = f"newplots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.png"
+    plt.savefig(figname, format='png')
+    print(f"Generated {figname}")
+
+# Listen their updates
+for i, d in enumerate(devices):
+    thread = threading.Thread(target=listenDevice, args=(d, i))
+    thread.daemon = True
+    thread.start()
+
 while True:
     #if (repaint_graph): 
     plot_graph()

@@ -135,6 +135,9 @@ void train(int nb, bool only_forward) {
     float myTarget[3] = {0};
     myTarget[nb-1] = 1.f; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
 
+        // FORWARD
+    float forward_error = myNetwork.forward(features_matrix.buffer, myTarget);
+    
     float backward_error = 0;
     if (!only_forward) {
         // BACKWARD
@@ -142,13 +145,12 @@ void train(int nb, bool only_forward) {
         ++num_epochs;
     }
 
-    // FORWARD
-    float forward_error = myNetwork.forward(features_matrix.buffer, myTarget);
+
 
     float error = forward_error;
-    if (!only_forward) {
-        error = backward_error;
-    }
+    //if (!only_forward) {
+    //    error = backward_error;
+    //}
 
     float* myOutput = myNetwork.get_output();
 
@@ -193,8 +195,6 @@ void loop() {
 
     uint8_t num_button = 0;
 
-    bool only_forward = false;
-
     if (digitalRead(button_1) == HIGH && (button_pressed == false || num_button == 1)) {
         digitalWrite(LEDR, LOW);  //  ON
         num_button = 1;
@@ -225,7 +225,6 @@ void loop() {
         digitalWrite(LEDB, LOW);  //  ON
 
         Serial.println("start_fl");
-        // only_forward = true;
 
         // Debounce
         while(digitalRead(button_4) == HIGH) {}
@@ -241,7 +240,7 @@ void loop() {
         }
         Serial.println("Recording done");
 
-        train(num_button, only_forward);
+        train(num_button, false);
 
         button_pressed = false;
     } else {
@@ -279,7 +278,7 @@ void loop() {
                  *****/
                 // Receiving hidden layer
                 for (uint16_t i = 0; i < (InputNodes+1) * HiddenNodes; ++i) {
-                    Serial.write('n');
+                    //Serial.write('n');
                     while(Serial.available() < 4) {}
                     for (int n = 0; n < 4; n++) {
                         myHiddenWeights[i*4+n] = Serial.read();
@@ -288,7 +287,7 @@ void loop() {
 
                 // Receiving output layer
                 for (uint16_t i = 0; i < (HiddenNodes+1) * OutputNodes; ++i) {
-                    Serial.write('n');
+                    //Serial.write('n');
                     while(Serial.available() < 4) {}
                     for (int n = 0; n < 4; n++) {
                         myOutputWeights[i*4+n] = Serial.read();
