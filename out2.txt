@@ -1,0 +1,717 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+PS C:\Users\Nil Torre\Desktop\DiPet\TinyML-FederatedLearning> python .\fl_server.py
+Number of devices: 3
+Available ports:
+COM12 - USB Serial Device (COM12)
+COM1 - Communications Port (COM1)
+COM21 - USB Serial Device (COM21)
+COM6 - USB Serial Device (COM6)  
+Port device_1: com6
+Port device_2: com12
+Port device_3: com21
+(com21): 
+(com6): Waiting for new model... 
+(com12): Waiting for new model...
+(com21): Waiting for new model...
+(com21): Waiting for new model...
+Sending model to com21
+(com12): Waiting for new model...
+(com6): Waiting for new model...
+Sending model to com6
+Sending model to com12
+Model sent to com12
+Model sent to com21
+Model sent to com6
+Sample sent in: 2481.59326171875 milliseconds)
+Sample sent in: 2513.59130859375 milliseconds)
+Sample sent in: 2518.592529296875 milliseconds)
+Sample sent in: 2479.27880859375 milliseconds)
+Sample sent in: 2506.2265625 milliseconds)
+Sample sent in: 2515.230224609375 milliseconds)
+Sample sent in: 2483.2861328125 milliseconds)
+Sample sent in: 2508.2470703125 milliseconds)
+Sample sent in: 2515.248779296875 milliseconds)
+Sample sent in: 2481.636962890625 milliseconds)
+Sample sent in: 2508.626708984375 milliseconds)
+Sample sent in: 2515.603759765625 milliseconds)
+Sample sent in: 2476.943603515625 milliseconds)
+Sample sent in: 2506.677490234375 milliseconds)
+Sample sent in: 2514.68017578125 milliseconds)
+Sample sent in: 2479.4951171875 milliseconds)
+Sample sent in: 2509.996826171875 milliseconds)
+Sample sent in: 2515.99462890625 milliseconds)
+Sample sent in: 2481.262939453125 milliseconds)
+Sample sent in: 2513.377685546875 milliseconds)
+Sample sent in: 2514.277587890625 milliseconds)
+Sample sent in: 2480.054443359375 milliseconds)
+Sample sent in: 2512.33642578125 milliseconds)
+Sample sent in: 2517.156005859375 milliseconds)
+Sample sent in: 2475.92041015625 milliseconds)
+Sample sent in: 2511.798828125 milliseconds)
+Sample sent in: 2517.248779296875 milliseconds)
+Sample sent in: 2476.51416015625 milliseconds)
+Sample sent in: 2518.7626953125 milliseconds)
+Sample sent in: 2516.588134765625 milliseconds)
+Sample sent in: 2478.08642578125 milliseconds)
+Sample sent in: 2513.115966796875 milliseconds)
+Sample sent in: 2516.814453125 milliseconds)
+Sample sent in: 2479.351318359375 milliseconds)
+Sample sent in: 2513.018798828125 milliseconds)
+Sample sent in: 2515.32421875 milliseconds)
+Sample sent in: 2479.845458984375 milliseconds)
+Sample sent in: 2514.314208984375 milliseconds)
+Sample sent in: 2516.176513671875 milliseconds)
+Sample sent in: 2481.88720703125 milliseconds)
+Sample sent in: 2511.721435546875 milliseconds)
+Sample sent in: 2514.86474609375 milliseconds)
+Sample sent in: 2478.771240234375 milliseconds)
+Sample sent in: 2512.023681640625 milliseconds)
+Sample sent in: 2516.993896484375 milliseconds)
+Batch time: 37.75879526138306 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com12] Connection accepted.
+[com21] Starting connection...
+[com21] Connection accepted.
+[com6] Scaled weight size: 2
+[com12] Scaled weight size: 2
+[com6] Min weight: -1.1060022115707397, max weight: 0.6257750988006592
+[com6] Scaling precision: 2.6425227899159212e-05
+[com6] Receiving model...
+[com21] Scaled weight size: 2
+[com21] Min weight: -0.9687068462371826, max weight: 0.7844385504722595
+[com6] Recevied Weight 0: 0.20641419291496277
+[com21] Scaling precision: 2.6751283996481912e-05
+[com21] Receiving model...
+[com6] Recevied Weight 1: 0.17338909208774567
+[com12] Min weight: -0.8924817442893982, max weight: 0.6872596740722656
+[com6] Recevied Weight 2: 0.059801679104566574
+[com12] Scaling precision: 2.410530889389889e-05
+[com6] Recevied Weight 3: -0.16832825541496277
+[com12] Receiving model...
+[com6] Recevied Weight 4: -0.13761946558952332
+[com6] Model received from com6 (3.466998815536499 seconds)
+[com12] Model received from com12 (3.6369974613189697 seconds)
+[com21] Model received from com21 (3.830031156539917 seconds)
+Average millis: 0.0 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.01826539635658264
+Sending model to com12 ...
+[com6] Sending weight 1: 0.012582796315352121
+[com6] Sending weight 2: 0.061131770412127175
+Sending model to com21 ...
+[com6] Sending weight 3: -0.05748440573612849
+[com6] Sending weight 4: -0.08323478450377782
+Model sent to com12 (2.195925712585449 seconds)
+Model sent to com6 (2.2249064445495605 seconds)
+Model sent to com21 (2.2269256114959717 seconds)
+FL time: 6.081927537918091 seconds)
+Sample sent in: 2486.0576171875 milliseconds)
+Sample sent in: 2525.00146484375 milliseconds)
+Sample sent in: 2527.00634765625 milliseconds)
+Sample sent in: 2502.998291015625 milliseconds)
+Sample sent in: 2521.007568359375 milliseconds)
+Sample sent in: 2529.014892578125 milliseconds)
+Sample sent in: 2489.39013671875 milliseconds)
+Sample sent in: 2517.341064453125 milliseconds)
+Sample sent in: 2516.340576171875 milliseconds)
+Sample sent in: 2481.21826171875 milliseconds)
+Sample sent in: 2513.22509765625 milliseconds)
+Sample sent in: 2517.22412109375 milliseconds)
+Sample sent in: 2482.625244140625 milliseconds)
+Sample sent in: 2509.88037109375 milliseconds)
+Sample sent in: 2513.890625 milliseconds)
+Sample sent in: 2486.284912109375 milliseconds)
+Sample sent in: 2510.945556640625 milliseconds)
+Sample sent in: 2516.9248046875 milliseconds)
+Sample sent in: 2481.564208984375 milliseconds)
+Sample sent in: 2514.20361328125 milliseconds)
+Sample sent in: 2516.210693359375 milliseconds)
+Sample sent in: 2473.990966796875 milliseconds)
+Sample sent in: 2515.452880859375 milliseconds)
+Sample sent in: 2515.454833984375 milliseconds)
+Sample sent in: 2479.562744140625 milliseconds)
+Sample sent in: 2509.8662109375 milliseconds)
+Sample sent in: 2515.86767578125 milliseconds)
+Sample sent in: 2476.638671875 milliseconds)
+Sample sent in: 2521.74951171875 milliseconds)
+Sample sent in: 2517.692626953125 milliseconds)
+Sample sent in: 2475.052978515625 milliseconds)
+Sample sent in: 2509.72119140625 milliseconds)
+Sample sent in: 2516.73486328125 milliseconds)
+Sample sent in: 2480.275634765625 milliseconds)
+Sample sent in: 2508.753173828125 milliseconds)
+Sample sent in: 2518.4365234375 milliseconds)
+Sample sent in: 2479.477294921875 milliseconds)
+Sample sent in: 2508.06005859375 milliseconds)
+Sample sent in: 2512.13916015625 milliseconds)
+Sample sent in: 2478.634521484375 milliseconds)
+Sample sent in: 2509.887939453125 milliseconds)
+Sample sent in: 2515.130615234375 milliseconds)
+Sample sent in: 2481.749755859375 milliseconds)
+Sample sent in: 2512.858154296875 milliseconds)
+Sample sent in: 2516.698974609375 milliseconds)
+Batch time: 37.783732175827026 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com21] Starting connection...
+[com12] Connection accepted.
+[com21] Connection accepted.
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.227695107460022, max weight: 1.372765064239502
+[com12] Scaled weight size: 2
+[com6] Scaling precision: 3.968047870144997e-05
+[com12] Min weight: -1.308313250541687, max weight: 1.1845942735671997
+[com6] Receiving model...
+[com12] Scaling precision: 3.803933049681676e-05
+[com21] Scaled weight size: 2
+[com12] Receiving model...
+[com21] Min weight: -1.4458794593811035, max weight: 1.4312248229980469
+[com6] Recevied Weight 0: 0.15361244976520538
+[com21] Scaling precision: 4.39017972439025e-05
+[com6] Recevied Weight 1: 0.14051230251789093
+[com21] Receiving model...
+[com6] Recevied Weight 2: 0.08599347621202469
+[com6] Recevied Weight 3: -0.05948119983077049
+[com6] Recevied Weight 4: -0.14164257049560547
+[com21] Model received from com21 (3.6559956073760986 seconds)
+[com6] Model received from com6 (3.7079973220825195 seconds)
+[com12] Model received from com12 (3.7879979610443115 seconds)
+Average millis: 0.0 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.08971844365199406
+Sending model to com12 ...
+[com6] Sending weight 1: 0.11802283674478531
+[com6] Sending weight 2: 0.07427493917445342
+[com6] Sending weight 3: -0.0938533457616965
+Sending model to com21 ...
+[com6] Sending weight 4: -0.12272892147302628
+Model sent to com12 (2.196634292602539 seconds)
+Model sent to com6 (2.2266361713409424 seconds)
+Model sent to com21 (2.2276363372802734 seconds)
+FL time: 6.033634424209595 seconds)
+Sample sent in: 2485.6552734375 milliseconds)
+Sample sent in: 2521.606201171875 milliseconds)
+Sample sent in: 2535.60009765625 milliseconds)
+Sample sent in: 2509.79736328125 milliseconds)
+Sample sent in: 2529.74951171875 milliseconds)
+Sample sent in: 2524.75537109375 milliseconds)
+Sample sent in: 2481.28759765625 milliseconds)
+Sample sent in: 2510.262451171875 milliseconds)
+Sample sent in: 2519.264892578125 milliseconds)
+Sample sent in: 2481.080078125 milliseconds)
+Sample sent in: 2510.514892578125 milliseconds)
+Sample sent in: 2516.516357421875 milliseconds)
+Sample sent in: 2483.95263671875 milliseconds)
+Sample sent in: 2511.49072265625 milliseconds)
+Sample sent in: 2517.488037109375 milliseconds)
+Sample sent in: 2481.882568359375 milliseconds)
+Sample sent in: 2508.889404296875 milliseconds)
+Sample sent in: 2517.599609375 milliseconds)
+Sample sent in: 2485.092529296875 milliseconds)
+Sample sent in: 2508.1630859375 milliseconds)
+Sample sent in: 2517.6103515625 milliseconds)
+Sample sent in: 2481.23583984375 milliseconds)
+Sample sent in: 2506.9287109375 milliseconds)
+Sample sent in: 2517.774658203125 milliseconds)
+Sample sent in: 2478.400390625 milliseconds)
+Sample sent in: 2506.5849609375 milliseconds)
+Sample sent in: 2517.57958984375 milliseconds)
+Sample sent in: 2473.74853515625 milliseconds)
+Sample sent in: 2506.92333984375 milliseconds)
+Sample sent in: 2518.63330078125 milliseconds)
+Sample sent in: 2478.866943359375 milliseconds)
+Sample sent in: 2506.867431640625 milliseconds)
+Sample sent in: 2517.84130859375 milliseconds)
+Sample sent in: 2480.78857421875 milliseconds)
+Sample sent in: 2519.975830078125 milliseconds)
+Sample sent in: 2515.287841796875 milliseconds)
+Sample sent in: 2476.944580078125 milliseconds)
+Sample sent in: 2509.2265625 milliseconds)
+Sample sent in: 2517.22412109375 milliseconds)
+Sample sent in: 2479.046630859375 milliseconds)
+Sample sent in: 2506.430908203125 milliseconds)
+Sample sent in: 2515.43310546875 milliseconds)
+Sample sent in: 2475.489990234375 milliseconds)
+Sample sent in: 2508.792236328125 milliseconds)
+Sample sent in: 2511.745849609375 milliseconds)
+Batch time: 37.797693729400635 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com21] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com21] Connection accepted.
+[com12] Connection accepted.
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.4299812316894531, max weight: 1.2508342266082764
+[com6] Scaling precision: 4.090662177916731e-05
+[com21] Scaled weight size: 2
+[com6] Receiving model...
+[com21] Min weight: -1.5619279146194458, max weight: 1.3645700216293335
+[com6] Recevied Weight 0: 0.13195836544036865
+[com21] Scaling precision: 4.465549608985701e-05
+[com12] Scaled weight size: 2
+[com21] Receiving model...
+[com12] Min weight: -1.9336776733398438, max weight: 1.7969022989273071
+[com6] Recevied Weight 1: 0.14087113738059998
+[com12] Scaling precision: 5.6925001484201584e-05
+[com12] Receiving model...
+[com6] Recevied Weight 2: 0.08251282572746277
+[com6] Recevied Weight 3: -0.09219646453857422
+[com6] Recevied Weight 4: -0.1312180608510971
+[com21] Model received from com21 (3.699021100997925 seconds)
+[com12] Model received from com12 (3.7070000171661377 seconds)
+[com6] Model received from com6 (3.804027557373047 seconds)
+Average millis: 0.972900390625 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.12617688129345575
+Sending model to com21 ...
+[com6] Sending weight 1: 0.15140803158283234
+Sending model to com12 ...
+[com6] Sending weight 2: 0.07092613478501637
+[com6] Sending weight 3: -0.11508508523305257
+[com6] Sending weight 4: -0.13749924302101135
+Model sent to com12 (2.197171449661255 seconds)
+Model sent to com6 (2.2261717319488525 seconds)
+Model sent to com21 (2.225172996520996 seconds)
+FL time: 6.044198274612427 seconds)
+Sample sent in: 2484.97802734375 milliseconds)
+Sample sent in: 2520.971435546875 milliseconds)
+Sample sent in: 2527.97216796875 milliseconds)
+Sample sent in: 2503.635986328125 milliseconds)
+Sample sent in: 2518.6015625 milliseconds)
+Sample sent in: 2525.602294921875 milliseconds)
+Sample sent in: 2481.483642578125 milliseconds)
+Sample sent in: 2509.4677734375 milliseconds)
+Sample sent in: 2516.467529296875 milliseconds)
+Sample sent in: 2487.130859375 milliseconds)
+Sample sent in: 2510.112060546875 milliseconds)
+Sample sent in: 2515.079345703125 milliseconds)
+Sample sent in: 2483.6533203125 milliseconds)
+Sample sent in: 2506.323974609375 milliseconds)
+Sample sent in: 2518.323974609375 milliseconds)
+Sample sent in: 2479.669677734375 milliseconds)
+Sample sent in: 2506.890869140625 milliseconds)
+Sample sent in: 2517.89013671875 milliseconds)
+Sample sent in: 2485.105224609375 milliseconds)
+Sample sent in: 2508.020751953125 milliseconds)
+Sample sent in: 2518.020263671875 milliseconds)
+Sample sent in: 2480.712890625 milliseconds)
+Sample sent in: 2508.1376953125 milliseconds)
+Sample sent in: 2517.433837890625 milliseconds)
+Sample sent in: 2477.047119140625 milliseconds)
+Sample sent in: 2510.216796875 milliseconds)
+Sample sent in: 2519.295654296875 milliseconds)
+Sample sent in: 2475.843505859375 milliseconds)
+Sample sent in: 2510.240234375 milliseconds)
+Sample sent in: 2519.86572265625 milliseconds)
+Sample sent in: 2477.769287109375 milliseconds)
+Sample sent in: 2512.91357421875 milliseconds)
+Sample sent in: 2519.035400390625 milliseconds)
+Sample sent in: 2477.8623046875 milliseconds)
+Sample sent in: 2510.959716796875 milliseconds)
+Sample sent in: 2514.8203125 milliseconds)
+Sample sent in: 2477.468017578125 milliseconds)
+Sample sent in: 2511.46533203125 milliseconds)
+Sample sent in: 2515.881103515625 milliseconds)
+Sample sent in: 2478.962890625 milliseconds)
+Sample sent in: 2509.034912109375 milliseconds)
+Sample sent in: 2517.09814453125 milliseconds)
+Sample sent in: 2478.981689453125 milliseconds)
+Sample sent in: 2511.744873046875 milliseconds)
+Sample sent in: 2519.161376953125 milliseconds)
+Batch time: 37.79900550842285 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com12] Connection accepted.
+[com21] Starting connection...
+[com21] Connection accepted.
+[com12] Scaled weight size: 2
+[com12] Min weight: -1.6761822700500488, max weight: 1.5837088823318481
+[com12] Scaling precision: 4.97427504750423e-05
+[com12] Receiving model...
+[com21] Scaled weight size: 2
+[com21] Min weight: -1.75027334690094, max weight: 1.4920061826705933
+[com21] Scaling precision: 4.94740143369426e-05
+[com21] Receiving model...
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.7864136695861816, max weight: 1.6009670495986938
+[com6] Scaling precision: 5.168811656648929e-05
+[com6] Receiving model...
+[com6] Recevied Weight 0: 0.13826872408390045
+[com6] Recevied Weight 1: 0.15817999839782715
+[com6] Recevied Weight 2: 0.07193514704704285
+[com6] Recevied Weight 3: -0.28005754947662354
+[com6] Recevied Weight 4: -0.1580548882484436
+[com12] Model received from com12 (3.62501859664917 seconds)
+[com6] Model received from com6 (3.6359994411468506 seconds)
+[com21] Model received from com21 (3.648016929626465 seconds)
+Average millis: 0.97900390625 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.13627197841803232
+Sending model to com12 ...
+[com6] Sending weight 1: 0.15319066246350607
+Sending model to com21 ...
+[com6] Sending weight 2: 0.0629627803961436
+[com6] Sending weight 3: -0.18652312209208807
+[com6] Sending weight 4: -0.14671519895394644
+Model sent to com12 (2.196885108947754 seconds)
+Model sent to com6 (2.2268824577331543 seconds)
+Model sent to com21 (2.2288882732391357 seconds)
+FL time: 5.9088380336761475 seconds)
+Sample sent in: 2484.193359375 milliseconds)
+Sample sent in: 2524.137451171875 milliseconds)
+Sample sent in: 2531.139892578125 milliseconds)
+Sample sent in: 2496.096435546875 milliseconds)
+Sample sent in: 2525.511474609375 milliseconds)
+Sample sent in: 2526.51123046875 milliseconds)
+Sample sent in: 2483.376953125 milliseconds)
+Sample sent in: 2512.332763671875 milliseconds)
+Sample sent in: 2519.336181640625 milliseconds)
+Sample sent in: 2482.571533203125 milliseconds)
+Sample sent in: 2511.537353515625 milliseconds)
+Sample sent in: 2514.537109375 milliseconds)
+Sample sent in: 2484.295654296875 milliseconds)
+Sample sent in: 2510.226806640625 milliseconds)
+Sample sent in: 2515.22705078125 milliseconds)
+Sample sent in: 2481.442626953125 milliseconds)
+Sample sent in: 2509.8525390625 milliseconds)
+Sample sent in: 2516.82421875 milliseconds)
+Sample sent in: 2478.323974609375 milliseconds)
+Sample sent in: 2510.999267578125 milliseconds)
+Sample sent in: 2518.0234375 milliseconds)
+Sample sent in: 2478.211181640625 milliseconds)
+Sample sent in: 2513.7431640625 milliseconds)
+Sample sent in: 2518.2734375 milliseconds)
+Sample sent in: 2477.005126953125 milliseconds)
+Sample sent in: 2508.52294921875 milliseconds)
+Sample sent in: 2517.59033203125 milliseconds)
+Sample sent in: 2480.970703125 milliseconds)
+Sample sent in: 2508.86328125 milliseconds)
+Sample sent in: 2517.061767578125 milliseconds)
+Sample sent in: 2479.308349609375 milliseconds)
+Sample sent in: 2508.76611328125 milliseconds)
+Sample sent in: 2513.811767578125 milliseconds)
+Sample sent in: 2479.0302734375 milliseconds)
+Sample sent in: 2509.1728515625 milliseconds)
+Sample sent in: 2513.332275390625 milliseconds)
+Sample sent in: 2479.7646484375 milliseconds)
+Sample sent in: 2512.489013671875 milliseconds)
+Sample sent in: 2512.4814453125 milliseconds)
+Sample sent in: 2475.83251953125 milliseconds)
+Sample sent in: 2520.38818359375 milliseconds)
+Sample sent in: 2517.386962890625 milliseconds)
+Sample sent in: 2476.17236328125 milliseconds)
+Sample sent in: 2513.381103515625 milliseconds)
+Sample sent in: 2516.016357421875 milliseconds)
+Batch time: 37.777557373046875 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com21] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com21] Connection accepted.
+[com12] Connection accepted.
+[com12] Scaled weight size: 2
+[com12] Min weight: -1.6562490463256836, max weight: 1.6007100343704224
+[com12] Scaling precision: 4.969800992898613e-05
+[com12] Receiving model...
+[com21] Scaled weight size: 2
+[com21] Min weight: -1.9517278671264648, max weight: 1.7521111965179443
+[com21] Scaling precision: 5.651696137398961e-05
+[com21] Receiving model...
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.7940844297409058, max weight: 1.618600845336914
+[com6] Scaling precision: 5.20742393389459e-05
+[com6] Receiving model...
+[com6] Recevied Weight 0: 0.13880367577075958
+[com6] Recevied Weight 1: 0.15343961119651794
+[com6] Recevied Weight 2: 0.06125200167298317
+[com6] Recevied Weight 3: -0.22959862649440765
+[com6] Recevied Weight 4: -0.15438929200172424
+[com6] Model received from com6 (3.6140260696411133 seconds)
+[com12] Model received from com12 (3.6570229530334473 seconds)
+[com21] Model received from com21 (3.8129992485046387 seconds)
+Average millis: 0.0 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.14787154893080393
+Sending model to com21 ...
+[com6] Sending weight 1: 0.14275739590326944
+[com6] Sending weight 2: 0.06406527136762936
+[com6] Sending weight 3: -0.15157970786094666
+[com6] Sending weight 4: -0.14747141798337302
+Sending model to com12 ...
+Model sent to com12 (2.195512533187866 seconds)
+Model sent to com6 (2.233273983001709 seconds)
+Model sent to com21 (2.2342779636383057 seconds)
+FL time: 6.088273763656616 seconds)
+Sample sent in: 2482.43408203125 milliseconds)
+Sample sent in: 2519.42822265625 milliseconds)
+Sample sent in: 2525.431396484375 milliseconds)
+Sample sent in: 2492.28955078125 milliseconds)
+Sample sent in: 2525.256591796875 milliseconds)
+Sample sent in: 2526.25537109375 milliseconds)
+Sample sent in: 2486.5234375 milliseconds)
+Sample sent in: 2512.501708984375 milliseconds)
+Sample sent in: 2521.47509765625 milliseconds)
+Sample sent in: 2483.5263671875 milliseconds)
+Sample sent in: 2514.50537109375 milliseconds)
+Sample sent in: 2516.53515625 milliseconds)
+Sample sent in: 2480.991455078125 milliseconds)
+Sample sent in: 2511.388671875 milliseconds)
+Sample sent in: 2517.385498046875 milliseconds)
+Sample sent in: 2492.592041015625 milliseconds)
+Sample sent in: 2513.580810546875 milliseconds)
+Sample sent in: 2519.5810546875 milliseconds)
+Sample sent in: 2487.008056640625 milliseconds)
+Sample sent in: 2512.154052734375 milliseconds)
+Sample sent in: 2519.9931640625 milliseconds)
+Sample sent in: 2477.719970703125 milliseconds)
+Sample sent in: 2514.287109375 milliseconds)
+Sample sent in: 2519.443603515625 milliseconds)
+Sample sent in: 2478.8388671875 milliseconds)
+Sample sent in: 2510.888671875 milliseconds)
+Sample sent in: 2519.41064453125 milliseconds)
+Sample sent in: 2479.338623046875 milliseconds)
+Sample sent in: 2512.868408203125 milliseconds)
+Sample sent in: 2515.34228515625 milliseconds)
+Sample sent in: 2479.025390625 milliseconds)
+Sample sent in: 2513.338623046875 milliseconds)
+Sample sent in: 2518.8271484375 milliseconds)
+Sample sent in: 2476.6923828125 milliseconds)
+Sample sent in: 2513.5126953125 milliseconds)
+Sample sent in: 2516.0205078125 milliseconds)
+Sample sent in: 2480.780517578125 milliseconds)
+Sample sent in: 2512.958740234375 milliseconds)
+Sample sent in: 2518.53369140625 milliseconds)
+Sample sent in: 2479.42724609375 milliseconds)
+Sample sent in: 2516.975341796875 milliseconds)
+Sample sent in: 2516.3994140625 milliseconds)
+Sample sent in: 2477.997802734375 milliseconds)
+Sample sent in: 2513.78369140625 milliseconds)
+Sample sent in: 2519.4072265625 milliseconds)
+Batch time: 37.80700659751892 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com21] Starting connection...
+[com6] Connection accepted.
+[com12] Connection accepted.
+[com21] Connection accepted.
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.7467999458312988, max weight: 1.704187035560608
+[com21] Scaled weight size: 2
+[com12] Scaled weight size: 2
+[com21] Min weight: -1.7832368612289429, max weight: 1.7175638675689697
+[com12] Min weight: -1.9007244110107422, max weight: 1.9333040714263916
+[com21] Scaling precision: 5.341879497669814e-05
+[com12] Scaling precision: 5.850352456606598e-05
+[com21] Receiving model...
+[com12] Receiving model...
+[com6] Scaling precision: 5.2658685914273394e-05
+[com6] Receiving model...
+[com6] Recevied Weight 0: 0.14844632148742676
+[com6] Recevied Weight 1: 0.14119450747966766
+[com6] Recevied Weight 2: 0.06368440389633179
+[com6] Recevied Weight 3: -0.159421905875206
+[com6] Recevied Weight 4: -0.1490190029144287
+[com6] Model received from com6 (3.6659953594207764 seconds)
+[com21] Model received from com21 (3.7099969387054443 seconds)
+[com12] Model received from com12 (3.78399395942688 seconds)
+Average millis: 0.0 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.1532955914735794
+Sending model to com12 ...
+[com6] Sending weight 1: 0.1225569595893224
+[com6] Sending weight 2: 0.0849490041534106
+Sending model to com21 ...
+[com6] Sending weight 3: -0.03712300459543864
+[com6] Sending weight 4: -0.13331648210684457
+Model sent to com12 (2.1971185207366943 seconds)
+Model sent to com6 (2.226133346557617 seconds)
+Model sent to com21 (2.228133201599121 seconds)
+FL time: 6.049124717712402 seconds)
+Sample sent in: 2492.62451171875 milliseconds)
+Sample sent in: 2535.569091796875 milliseconds)
+Sample sent in: 2528.572021484375 milliseconds)
+Sample sent in: 2496.760009765625 milliseconds)
+Sample sent in: 2519.71875 milliseconds)
+Sample sent in: 2524.7275390625 milliseconds)
+Sample sent in: 2489.319091796875 milliseconds)
+Sample sent in: 2507.345947265625 milliseconds)
+Sample sent in: 2518.3212890625 milliseconds)
+Sample sent in: 2485.75048828125 milliseconds)
+Sample sent in: 2509.677734375 milliseconds)
+Sample sent in: 2518.703125 milliseconds)
+Sample sent in: 2488.753662109375 milliseconds)
+Sample sent in: 2511.709228515625 milliseconds)
+Sample sent in: 2516.715087890625 milliseconds)
+Sample sent in: 2486.05078125 milliseconds)
+Sample sent in: 2510.01611328125 milliseconds)
+Sample sent in: 2520.00537109375 milliseconds)
+Sample sent in: 2482.68212890625 milliseconds)
+Sample sent in: 2509.940673828125 milliseconds)
+Sample sent in: 2518.460205078125 milliseconds)
+Sample sent in: 2479.191162109375 milliseconds)
+Sample sent in: 2509.58349609375 milliseconds)
+Sample sent in: 2519.601318359375 milliseconds)
+Sample sent in: 2473.811279296875 milliseconds)
+Sample sent in: 2510.793212890625 milliseconds)
+Sample sent in: 2517.5322265625 milliseconds)
+Sample sent in: 2477.420166015625 milliseconds)
+Sample sent in: 2509.56494140625 milliseconds)
+Sample sent in: 2520.172119140625 milliseconds)
+Sample sent in: 2477.35009765625 milliseconds)
+Sample sent in: 2509.568603515625 milliseconds)
+Sample sent in: 2516.90087890625 milliseconds)
+Sample sent in: 2483.10791015625 milliseconds)
+Sample sent in: 2516.494384765625 milliseconds)
+Sample sent in: 2517.287353515625 milliseconds)
+Sample sent in: 2478.68017578125 milliseconds)
+Sample sent in: 2512.175048828125 milliseconds)
+Sample sent in: 2518.177490234375 milliseconds)
+Sample sent in: 2477.791015625 milliseconds)
+Sample sent in: 2511.77490234375 milliseconds)
+Sample sent in: 2518.205322265625 milliseconds)
+Sample sent in: 2477.55078125 milliseconds)
+Sample sent in: 2513.37548828125 milliseconds)
+Sample sent in: 2518.88623046875 milliseconds)
+Batch time: 37.82926964759827 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com21] Starting connection...
+[com6] Connection accepted.
+[com12] Connection accepted.
+[com21] Connection accepted.
+[com6] Scaled weight size: 2
+[com6] Min weight: -1.6598111391067505, max weight: 1.704913854598999
+[com12] Scaled weight size: 2
+[com12] Min weight: -2.2516252994537354, max weight: 2.096418619155884
+[com6] Scaling precision: 5.134241235531776e-05
+[com12] Scaling precision: 6.634689736186189e-05
+[com6] Receiving model...
+[com12] Receiving model...
+[com21] Scaled weight size: 2
+[com6] Recevied Weight 0: 0.15342560410499573
+[com21] Min weight: -1.7200485467910767, max weight: 1.6683374643325806
+[com6] Recevied Weight 1: 0.1221245527267456
+[com21] Scaling precision: 5.170345633819573e-05
+[com21] Receiving model...
+[com6] Recevied Weight 2: 0.08479779958724976
+[com6] Recevied Weight 3: -0.03839040920138359
+[com6] Recevied Weight 4: -0.1336638182401657
+[com12] Model received from com12 (3.5359995365142822 seconds)
+[com21] Model received from com21 (3.5589981079101562 seconds)
+[com6] Model received from com6 (3.5829989910125732 seconds)
+Average millis: 0.0 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.15577361484368643
+Sending model to com12 ...
+[com6] Sending weight 1: 0.11803356558084488
+[com6] Sending weight 2: 0.0909906526406606
+Sending model to com21 ...
+[com6] Sending weight 3: -0.011892571424444517
+[com6] Sending weight 4: -0.13053878645102182
+Model sent to com12 (2.198519468307495 seconds)
+Model sent to com6 (2.2255327701568604 seconds)
+Model sent to com21 (2.2295267581939697 seconds)
+FL time: 5.839532375335693 seconds)
+Sample sent in: 2485.421875 milliseconds)
+Sample sent in: 2526.378173828125 milliseconds)
+Sample sent in: 2526.37548828125 milliseconds)
+Sample sent in: 2501.05078125 milliseconds)
+Sample sent in: 2518.05859375 milliseconds)
+Sample sent in: 2527.0556640625 milliseconds)
+Sample sent in: 2486.107421875 milliseconds)
+Sample sent in: 2509.0703125 milliseconds)
+Sample sent in: 2520.070068359375 milliseconds)
+Sample sent in: 2483.647216796875 milliseconds)
+Sample sent in: 2510.60009765625 milliseconds)
+Sample sent in: 2518.60009765625 milliseconds)
+Sample sent in: 2480.205810546875 milliseconds)
+Sample sent in: 2510.18505859375 milliseconds)
+Sample sent in: 2518.60546875 milliseconds)
+Sample sent in: 2479.789794921875 milliseconds)
+Sample sent in: 2506.75830078125 milliseconds)
+Sample sent in: 2519.611572265625 milliseconds)
+Sample sent in: 2481.6767578125 milliseconds)
+Sample sent in: 2509.216064453125 milliseconds)
+Sample sent in: 2516.904052734375 milliseconds)
+Sample sent in: 2473.361328125 milliseconds)
+Sample sent in: 2510.511474609375 milliseconds)
+Sample sent in: 2519.549560546875 milliseconds)
+Sample sent in: 2476.523193359375 milliseconds)
+Sample sent in: 2517.9580078125 milliseconds)
+Sample sent in: 2514.541015625 milliseconds)
+Sample sent in: 2476.810546875 milliseconds)
+Sample sent in: 2519.019287109375 milliseconds)
+Sample sent in: 2517.436767578125 milliseconds)
+Sample sent in: 2474.463134765625 milliseconds)
+Sample sent in: 2508.31298828125 milliseconds)
+Sample sent in: 2517.31494140625 milliseconds)
+Sample sent in: 2477.551025390625 milliseconds)
+Sample sent in: 2513.29248046875 milliseconds)
+Sample sent in: 2517.31982421875 milliseconds)
+Sample sent in: 2476.440673828125 milliseconds)
+Sample sent in: 2508.568603515625 milliseconds)
+Sample sent in: 2515.387451171875 milliseconds)
+Sample sent in: 2479.18212890625 milliseconds)
+Sample sent in: 2508.612548828125 milliseconds)
+Sample sent in: 2515.790771484375 milliseconds)
+Sample sent in: 2478.146484375 milliseconds)
+Sample sent in: 2514.623046875 milliseconds)
+Sample sent in: 2517.62060546875 milliseconds)
+Batch time: 37.796178579330444 seconds)
+Starting Federated Learning
+[com6] Starting connection...
+[com12] Starting connection...
+[com6] Connection accepted.
+[com21] Starting connection...
+[com12] Connection accepted.
+[com21] Connection accepted.
+[com6] Scaled weight size: 2
+[com12] Scaled weight size: 2
+[com6] Min weight: -2.4403510093688965, max weight: 2.4201622009277344
+[com21] Scaled weight size: 2
+[com6] Scaling precision: 7.416667750509851e-05
+[com21] Min weight: -1.8849142789840698, max weight: 1.7602492570877075
+[com6] Receiving model...
+[com21] Scaling precision: 5.562163021395861e-05
+[com12] Min weight: -2.1187970638275146, max weight: 2.017564296722412
+[com21] Receiving model...
+[com12] Scaling precision: 6.311682857328034e-05
+[com12] Receiving model...
+[com6] Recevied Weight 0: 0.16317737102508545
+[com6] Recevied Weight 1: 0.11494063585996628
+[com6] Recevied Weight 2: 0.08436521887779236
+[com6] Recevied Weight 3: -0.03159860149025917
+[com6] Recevied Weight 4: -0.1306203156709671
+[com12] Model received from com12 (3.594996452331543 seconds)
+[com6] Model received from com6 (3.6429965496063232 seconds)
+[com21] Model received from com21 (3.7399983406066895 seconds)
+Average millis: 1.001708984375 milliseconds)
+Sending model to com6 ...
+[com6] Sending weight 0: 0.15876489877700806
+Sending model to com12 ...
+[com6] Sending weight 1: 0.11636984099944432
+[com6] Sending weight 2: 0.08331036070982616
+Sending model to com21 ...
+[com6] Sending weight 3: -0.013436186670636138
+[com6] Sending weight 4: -0.1301606943209966
+Model sent to com12 (2.1956632137298584 seconds)
+Model sent to com6 (2.2250304222106934 seconds)
+Model sent to com21 (2.2290284633636475 seconds)
+FL time: 5.987032175064087 seconds)
+Generated plots/BS15-LR0.6-M0.9-HL25-TT350.38779854774475-iid.png

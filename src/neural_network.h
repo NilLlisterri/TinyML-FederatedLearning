@@ -12,13 +12,16 @@ static const int HiddenNodes = 25;
 static const int OutputNodes = 3;
 static const float InitialWeightMax = 0.5;
 
+typedef unsigned int uint;
+static const uint hiddenWeightsAmt = (InputNodes + 1) * HiddenNodes;
+static const uint outputWeightsAmt = (HiddenNodes + 1) * OutputNodes;
+
 class NeuralNetwork {
     public:
 
         void initialize(float LearningRate, float Momentum);
         // ~NeuralNetwork();
 
-        void initWeights();
         float forward(const float Input[], const float Target[]);
         float backward(const float Input[], const float Target[]);
 

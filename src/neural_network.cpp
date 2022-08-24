@@ -10,24 +10,6 @@ void NeuralNetwork::initialize(float LearningRate, float Momentum) {
     this->Momentum = Momentum;
 }
 
-void NeuralNetwork::initWeights() {
-    for(int i = 0 ; i < HiddenNodes ; i++ ) {    
-        for(int j = 0 ; j <= InputNodes ; j++ ) { 
-            ChangeHiddenWeights[j*HiddenNodes + i] = 0.0 ;
-            float Rando = float(random(100))/100;
-            HiddenWeights[j*HiddenNodes + i] = 2.0 * ( Rando - 0.5 ) * InitialWeightMax ;
-        }
-    }
-
-    for(int i = 0 ; i < OutputNodes ; i ++ ) {    
-        for(int j = 0 ; j <= HiddenNodes ; j++ ) {
-            ChangeOutputWeights[j*OutputNodes + i] = 0.0 ;  
-            float Rando = float(random(100))/100;        
-            OutputWeights[j*OutputNodes + i] = 2.0 * ( Rando - 0.5 ) * InitialWeightMax ;
-        }
-    }
-}
-
 float NeuralNetwork::forward(const float Input[], const float Target[]){
     float error = 0;
 
