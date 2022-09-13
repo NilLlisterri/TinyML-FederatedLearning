@@ -13,9 +13,7 @@ void NeuralNetwork::initialize(float LearningRate, float Momentum) {
 float NeuralNetwork::forward(const float Input[], const float Target[]){
     float error = 0;
 
-    /******************************************************************
-    * Compute hidden layer activations
-    ******************************************************************/
+    // Compute hidden layer activations
     for (int i = 0; i < HiddenNodes; i++) {
         float Accum = HiddenWeights[InputNodes*HiddenNodes + i];
         for (int j = 0; j < InputNodes; j++) {
@@ -24,16 +22,13 @@ float NeuralNetwork::forward(const float Input[], const float Target[]){
         Hidden[i] = 1.0 / (1.0 + exp(-Accum));
     }
 
-    /******************************************************************
-    * Compute output layer activations and calculate errors
-    ******************************************************************/
+    // Compute output layer activations and calculate errors
     for (int i = 0; i < OutputNodes; i++) {
         float Accum = OutputWeights[HiddenNodes*OutputNodes + i];
         for (int j = 0; j < HiddenNodes; j++) {
             Accum += Hidden[j] * OutputWeights[j*OutputNodes + i];
         }
         Output[i] = 1.0 / (1.0 + exp(-Accum));
-        // OutputDelta[i] = (Target[i] - Output[i]) * Output[i] * (1.0 - Output[i]);
         error += 0.33333 * (Target[i] - Output[i]) * (Target[i] - Output[i]);
     }
     return error;
@@ -43,9 +38,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
     float error = 0;
 
     // Forward
-    /******************************************************************
-    * Compute hidden layer activations
-    ******************************************************************/
+    // Compute hidden layer activations
     for (int i = 0; i < HiddenNodes; i++) {
         float Accum = HiddenWeights[InputNodes*HiddenNodes + i];
         for (int j = 0; j < InputNodes; j++) {
@@ -54,9 +47,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         Hidden[i] = 1.0 / (1.0 + exp(-Accum));
     }
 
-    /******************************************************************
-    * Compute output layer activations and calculate errors
-    ******************************************************************/
+    // Compute output layer activations and calculate errors
     for (int i = 0; i < OutputNodes; i++) {
         float Accum = OutputWeights[HiddenNodes*OutputNodes + i];
         for (int j = 0; j < HiddenNodes; j++) {
@@ -69,9 +60,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
     // End forward
 
     // Backward
-    /******************************************************************
-    * Backpropagate errors to hidden layer
-    ******************************************************************/
+    // Backpropagate errors to hidden layer
     for(int i = 0 ; i < HiddenNodes ; i++ ) {    
         float Accum = 0.0 ;
         for(int j = 0 ; j < OutputNodes ; j++ ) {
@@ -80,9 +69,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         HiddenDelta[i] = Accum * Hidden[i] * (1.0 - Hidden[i]) ;
     }
 
-    /******************************************************************
-    * Update Inner-->Hidden Weights
-    ******************************************************************/
+    // Update Inner-->Hidden Weights
     for(int i = 0 ; i < HiddenNodes ; i++ ) {     
         ChangeHiddenWeights[InputNodes*HiddenNodes + i] = LearningRate * HiddenDelta[i] + Momentum * ChangeHiddenWeights[InputNodes*HiddenNodes + i] ;
         HiddenWeights[InputNodes*HiddenNodes + i] += ChangeHiddenWeights[InputNodes*HiddenNodes + i] ;
@@ -92,9 +79,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         }
     }
 
-    /******************************************************************
-    * Update Hidden-->Output Weights
-    ******************************************************************/
+    // Update Hidden-->Output Weights
     for(int i = 0 ; i < OutputNodes ; i ++ ) {    
         ChangeOutputWeights[HiddenNodes*OutputNodes + i] = LearningRate * OutputDelta[i] + Momentum * ChangeOutputWeights[HiddenNodes*OutputNodes + i] ;
         OutputWeights[HiddenNodes*OutputNodes + i] += ChangeOutputWeights[HiddenNodes*OutputNodes + i] ;

@@ -1,0 +1,5 @@
+pyserial
+numpy
+matplotlib
+
+pio run --target upload -e nano33ble --upload-port com12; pio run --target upload -e nano33ble --upload-port com6; pio run --target upload -e nano33ble --upload-port com21

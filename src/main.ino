@@ -38,24 +38,22 @@ typedef int8_t scaledType;
  */
 void setup() {
     Serial.begin(9600);
+    Serial.setTimeout(5000); // Default 1000
 
-    pinMode(LED_BUILTIN, OUTPUT);
     pinMode(LEDR, OUTPUT);
     pinMode(LEDG, OUTPUT);
     pinMode(LEDB, OUTPUT);
+    
     digitalWrite(LEDR, HIGH);
     digitalWrite(LEDG, HIGH);
     digitalWrite(LEDB, HIGH);
 
-    digitalWrite(LED_BUILTIN, HIGH);
-
     init_network_model();
-    digitalWrite(LED_BUILTIN, LOW);
-
-    num_epochs = 0;
 }
 
 void init_network_model() {
+    digitalWrite(LEDR, LOW);
+    digitalWrite(LEDG, LOW);
     char startChar;
     do {
         startChar = Serial.read();
@@ -149,29 +147,43 @@ void train(int nb, bool only_forward) {
  * @brief      Arduino main function. Runs the inferencing loop.
  */
 void loop() {
-    digitalWrite(LEDR, HIGH);           // OFF
-    digitalWrite(LEDG, HIGH);           // OFF
-    digitalWrite(LEDB, HIGH);           // OFF
-    digitalWrite(LED_BUILTIN, HIGH);    // ON
+    digitalWrite(LEDR, HIGH);
+    digitalWrite(LEDG, HIGH);
+    digitalWrite(LEDB, HIGH);
 
-    int read = Serial.read();
-    if (read == '>') {
-        startFL();
-    } else if (read == 't') {
-        receiveSampleAndTrain();
+    if (Serial.available()) {
+        char read = Serial.read();
+        if (read == '>') {
+            startFL();
+        } else if (read == 't') {
+            receiveSampleAndTrain();
+        } else {
+            Serial.println("Unknown command " + read);
+            while(true){
+                delay(300);
+                digitalWrite(LEDR, LOW);
+                digitalWrite(LEDR, HIGH);
+            }
+        }
     }
+
+    delay(100);
+    digitalWrite(LEDG, LOW);
+    delay(100);
 }
 
 void receiveSampleAndTrain() {
+    digitalWrite(LEDR, LOW);
+    
     Serial.println("ok");
 
     while(Serial.available() < 1) {}
     uint8_t num_button = Serial.read();
-    Serial.print("Button "); Serial.println(num_button);
+    Serial.println("Button " + String(num_button));
 
     while(Serial.available() < 1) {}
     bool only_forward = Serial.read() == 1;
-    Serial.print("Only forward "); Serial.println(only_forward);
+    Serial.println("Only forward " + String(only_forward));
     
     byte ref[2];
     for(int i = 0; i < EI_CLASSIFIER_RAW_SAMPLE_COUNT; i++) {
@@ -180,14 +192,13 @@ void receiveSampleAndTrain() {
         inference.buffer[i] = 0;
         inference.buffer[i] = (ref[1] << 8) | ref[0];
     }
-    Serial.print("Sample received for button ");
-    Serial.println(num_button);
+    Serial.println("Sample received for button " + String(num_button));
     train(num_button, only_forward);
 }
 
 void startFL() {
+    digitalWrite(LEDB, LOW);
     Serial.write('<');
-    digitalWrite(LED_BUILTIN, HIGH);    // ON
     while(!Serial.available()) {}
     if (Serial.read() == 's') {
         Serial.println("start");
@@ -219,8 +230,6 @@ void startFL() {
                 scaledType weight = scaleWeight(min_weight, max_weight, float_hidden_weights[i]);
                 scaledType casted = weight;
                 Serial.write((byte*) &casted, sizeof(scaledType));
-                // Serial.write((byte*) &weight, sizeof(float)); // debug
-                // Serial.write((byte*) &float_hidden_weights[i], sizeof(float)); // debug
             } else {
                 Serial.write((byte*) &float_hidden_weights[i], sizeof(float)); // debug
             }
@@ -233,8 +242,6 @@ void startFL() {
                 scaledType weight = scaleWeight(min_weight, max_weight, float_output_weights[i]);
                 scaledType casted = weight;
                 Serial.write((byte*) &casted, sizeof(scaledType));
-                //Serial.write((byte*) &weight, sizeof(float)); // debug
-                // Serial.write((byte*) &float_output_weights[i], sizeof(float)); // debug
             } else {
                 Serial.write((byte*) &float_output_weights[i], sizeof(float)); // debug
             }
@@ -256,7 +263,6 @@ void startFL() {
                 }
             }
         }
-
         // Receiving output layer
         for (uint16_t i = 0; i < outputWeightsAmt; ++i) {
             if (mixed_precision) {
@@ -270,6 +276,7 @@ void startFL() {
                 }
             }
         }
+        Serial.println("Model received");
     }
 }
 
