@@ -1,3 +1,4 @@
+from ast import keyword
 import serial
 from serial.tools.list_ports import comports
 
@@ -15,16 +16,16 @@ from queue import Queue
 random.seed(4325)
 np.random.seed(4325)
 
-mixedPrecision = True
+mixedPrecision = False
 scaledWeightsSize = 1
 samples_per_device = 120 # Amount of samples of each word to send to each device
 batch_size = 10 # Must be even, hsa to be split into 2 types of samples
 experiment = 'train-test' # 'iid', 'no-iid', 'train-test', None
 use_threads = True
 
-debug = False
+debug = True
 
-test_samples_amount = 40
+test_samples_amount = 30
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*3
@@ -32,23 +33,32 @@ momentum = 0.9
 learningRate= 0.6
 pauseListen = False # So there are no threads reading the serial input at the same time
 
-montserrat_files = [file for file in os.listdir("datasets/kweywords") if file.startswith("montserrat")]
-pedraforca_files = [file for file in os.listdir("datasets/kweywords") if file.startswith("pedraforca")]
-vermell_files = [file for file in os.listdir("datasets/kweywords") if file.startswith("vermell")]
-blau_files = [file for file in os.listdir("datasets/kweywords") if file.startswith("blau")]
-#verd_files = [file for file in os.listdir("datasets/colors") if file.startswith("verd")]
+montserrat_files = [file for file in os.listdir("datasets/keywords") if file.startswith("montserrat")]
+pedraforca_files = [file for file in os.listdir("datasets/keywords") if file.startswith("pedraforca")]
+vermell_files = [file for file in os.listdir("datasets/keywords") if file.startswith("vermell")]
+blau_files = [file for file in os.listdir("datasets/keywords") if file.startswith("blau")]
+verd_files = [file for file in os.listdir("datasets/keywords") if file.startswith("verd")]
 
-#test_montserrat_files = [file for file in os.listdir("datasets/test/") if file.startswith("montserrat")]
-#test_pedraforca_files = [file for file in os.listdir("datasets/test") if file.startswith("pedraforca")]
+test_montserrat_files = [file for file in os.listdir("datasets/test-keywords/") if file.startswith("montserrat")]
+test_pedraforca_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("pedraforca")]
+test_blau_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("blau")]
+test_verd_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("verd")]
+test_vermell_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("vermell")]
 
 random.shuffle(montserrat_files)
 random.shuffle(pedraforca_files)
 random.shuffle(blau_files)
 
-keywords = list(sum(zip(montserrat_files, pedraforca_files), ()))
+keywords_buttons = {
+    "montserrat": 1,
+    "pedraforca": 2,
+    "vermell": 3
+}
 
-mountains = list(sum(zip(montserrat_files, pedraforca_files), ()))
-test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
+keywords = list(sum(zip(montserrat_files, pedraforca_files, vermell_files), ()))
+test_keywords = list(sum(zip(test_montserrat_files, test_pedraforca_files, test_vermell_files), ()))
+#mountains = list(sum(zip(montserrat_files, pedraforca_files), ()))
+#test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
 
 def print_until_keyword(keyword, arduino):
     while True: 
@@ -82,26 +92,25 @@ def init_network(hidden_layer, output_layer, device, deviceIndex):
     
 # Batch size: The amount of samples to send
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index, errors_queue, successes_queue):
-    global montserrat_files, pedraforca_files, mountains
+    global montserrat_files, pedraforca_files, keywords
 
     start = (deviceIndex*samples_per_device) + (batch_index * batch_size)
     end = (deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size
 
     if debug: print(f"[{device.port}] Sending samples from {start} to {end}")
 
-    files = mountains[start:end]
+    files = keywords[start:end]
     for i, filename in enumerate(files):
-        if (filename.startswith("montserrat")): num_button = 1
-        elif (filename.startswith("pedraforca")): num_button = 2
-        else: exit("Unknown button for sample")
+        keyword = filename.split(".")[0]
+        num_button = keywords_buttons[keyword]
 
         if debug: print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
-        error, success = sendSample(device, 'datasets/mountains/'+filename, num_button, deviceIndex)
+        error, success = sendSample(device, 'datasets/keywords/'+filename, num_button, deviceIndex)
         successes_queue.put(success)
         errors_queue.put(error)
 
 def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index, errors_queue, successes_queue):
-    global montserrat_files, pedraforca_files, vermell_files, verd_files, blau_files
+    global montserrat_files, pedraforca_files, blau_files, verd_files, vermell_files
 
     start = (batch_index * batch_size)
     end = (batch_index * batch_size) + batch_size
@@ -109,21 +118,18 @@ def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index, errors_queue
     if (deviceIndex == 0):
         files = vermell_files[start:end]
         num_button = 1
-        dir = 'colors'
     elif  (deviceIndex == 1):
         files = montserrat_files[start:end]
         num_button = 2
-        dir = 'mountains'
     elif  (deviceIndex == 2):
         files = pedraforca_files[start:end]
         num_button = 3
-        dir = 'mountains'
     else:
         exit("Exceeded device index")
 
     for i, filename in enumerate(files):
         print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
-        error, success = sendSample(device, f"datasets/{dir}/{filename}", num_button, deviceIndex)
+        error, success = sendSample(device, f"datasets/keywords/{filename}", num_button, deviceIndex)
         successes_queue.put(success)
         errors_queue.put(error)
 
@@ -157,7 +163,7 @@ def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False
     return error, num_button == num_button_predicted
 
 def sendTestSamples(device, deviceIndex):
-    global test_mountains
+    global test_keywords
 
     errors_queue = Queue()
     successes_queue = Queue()
@@ -167,13 +173,11 @@ def sendTestSamples(device, deviceIndex):
 
     if debug: print(f"[{device.port}] Sending test samples from {start} to {end}")
    
-    for i, filename in enumerate(test_mountains[start:end]):
-        if (filename.startswith("montserrat")): num_button = 1
-        elif (filename.startswith("pedraforca")): num_button = 2
-        elif (filename.startswith("vermell")): num_button = 3
-        else: exit("Unknown button for sample")
+    for i, filename in enumerate(test_keywords[start:end]):
+        keyword = filename.split(".")[0]
+        num_button = keywords_buttons[keyword]
         
-        error, success = sendSample(device, 'datasets/test/'+filename, num_button, deviceIndex, True)
+        error, success = sendSample(device, 'datasets/test-keywords/'+filename, num_button, deviceIndex, True)
         errors_queue.put(error)
         successes_queue.put(success)
     
