@@ -13,19 +13,19 @@ import os
 import random
 from queue import Queue
 
-random.seed(4325)
-np.random.seed(4325)
+random.seed(4321)
+np.random.seed(4321)
 
-mixedPrecision = False
+mixedPrecision = True
 scaledWeightsSize = 1
-samples_per_device = 120 # Amount of samples of each word to send to each device
-batch_size = 10 # Must be even, hsa to be split into 2 types of samples
+samples_per_device = 280 # Amount of samples of each word to send to each device
+batch_size = 6 # Must be even, has to be split into 3 types of samples
 experiment = 'train-test' # 'iid', 'no-iid', 'train-test', None
 use_threads = True
 
 debug = True
 
-test_samples_amount = 30
+test_samples_amount = 40
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*3
@@ -94,8 +94,8 @@ def init_network(hidden_layer, output_layer, device, deviceIndex):
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index, errors_queue, successes_queue):
     global montserrat_files, pedraforca_files, keywords
 
-    start = (deviceIndex*samples_per_device) + (batch_index * batch_size)
-    end = (deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size
+    start = ((deviceIndex*samples_per_device) + (batch_index * batch_size))%len(keywords)
+    end = ((deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size)%len(keywords)
 
     if debug: print(f"[{device.port}] Sending samples from {start} to {end}")
 
