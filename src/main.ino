@@ -30,8 +30,8 @@ const float threshold = 0.6;
 
 uint16_t num_epochs = 0;
 
-bool mixed_precision = true;
-typedef int8_t scaledType;
+bool mixed_precision = false;
+typedef int32_t scaledType;
 
 /**
  * @brief      Arduino setup function
@@ -61,6 +61,9 @@ void init_network_model() {
     } while(startChar != 's'); // s -> START
 
     Serial.println("start");
+    int seed = readInt();
+    srand(seed);
+    Serial.println("Seed: " + String(seed));
     float learningRate = readFloat();
     float momentum = readFloat();
 
@@ -96,6 +99,16 @@ float readFloat() {
     return *(float *)&res;
 }
 
+int readInt() {
+    byte res[4];
+    while(Serial.available() < 4) {}
+    for (int n = 0; n < 4; n++) {
+        res[n] = Serial.read();
+    }
+    
+    return *(int *)&res;
+}
+
 void train(int nb, bool only_forward) {
     signal_t signal;
     signal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
@@ -108,7 +121,7 @@ void train(int nb, bool only_forward) {
         return;
     }
 
-    float myTarget[3] = {0};
+    float myTarget[OutputNodes] = {0};
     myTarget[nb-1] = 1.f; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
 
     // FORWARD
@@ -125,7 +138,7 @@ void train(int nb, bool only_forward) {
 
     // Print outputs
     float* output = myNetwork.get_output();
-    for (size_t i = 0; i < 3; i++) {
+    for (size_t i = 0; i < OutputNodes; i++) {
         ei_printf_float(output[i]);
         Serial.print(" ");
     }
@@ -157,19 +170,19 @@ void loop() {
             startFL();
         } else if (read == 't') {
             receiveSampleAndTrain();
-        } else {
+        } else { // Error
             Serial.println("Unknown command " + read);
             while(true){
-                delay(300);
                 digitalWrite(LEDR, LOW);
+                delay(100);
                 digitalWrite(LEDR, HIGH);
             }
         }
     }
 
-    delay(100);
+    delay(50);
     digitalWrite(LEDG, LOW);
-    delay(100);
+    delay(50);
 }
 
 void receiveSampleAndTrain() {
@@ -245,6 +258,12 @@ void startFL() {
             } else {
                 Serial.write((byte*) &float_output_weights[i], sizeof(float)); // debug
             }
+        }
+
+        while(!Serial.available()) {
+            digitalWrite(LEDB, HIGH);
+            delay(100);
+            digitalWrite(LEDB, LOW);
         }
 
         float min_received_w = readFloat();

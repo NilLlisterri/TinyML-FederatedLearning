@@ -29,7 +29,7 @@ float NeuralNetwork::forward(const float Input[], const float Target[]){
             Accum += Hidden[j] * OutputWeights[j*OutputNodes + i];
         }
         Output[i] = 1.0 / (1.0 + exp(-Accum));
-        error += 0.33333 * (Target[i] - Output[i]) * (Target[i] - Output[i]);
+        error += (1.0/OutputNodes) * (Target[i] - Output[i]) * (Target[i] - Output[i]);
     }
     return error;
 }
@@ -55,7 +55,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         }
         Output[i] = 1.0 / (1.0 + exp(-Accum));
         OutputDelta[i] = (Target[i] - Output[i]) * Output[i] * (1.0 - Output[i]);
-        error += 0.33333 * (Target[i] - Output[i]) * (Target[i] - Output[i]);
+        error += (1.0/OutputNodes) * (Target[i] - Output[i]) * (Target[i] - Output[i]);
     }
     // End forward
 
