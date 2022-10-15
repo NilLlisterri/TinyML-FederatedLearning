@@ -13,15 +13,15 @@ import os
 import random
 from queue import Queue
 
-seed = 4323
+seed = 4321
 random.seed(seed)
 np.random.seed(seed)
 
-mixedPrecision = False
-scaledWeightsSize = 4
-samples_per_device = 30 # Amount of samples of each word to send to each device
+mixedPrecision = True
+scaledWeightsSize = 1
+samples_per_device = 500 # Amount of samples of each word to send to each device
 batch_size = 10 # Must be even, has to be split into 3 types of samples
-experiment = 'train-test' # 'iid', 'no-iid', 'train-test', None
+experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
 
 debug = True
 
@@ -60,8 +60,6 @@ random.shuffle(blau_files)
 random.shuffle(verd_files)
 random.shuffle(vermell_files)
 
-
-
 keywords = list(sum(zip(montserrat_files, pedraforca_files, vermell_files, blau_files), ()))
 test_keywords = list(sum(zip(test_montserrat_files, test_pedraforca_files, test_vermell_files, test_blau_files), ()))
 
@@ -99,21 +97,24 @@ def init_network(hidden_layer, output_layer, device):
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
     global montserrat_files, pedraforca_files, keywords
 
-    start = ((deviceIndex*samples_per_device) + (batch_index * batch_size))%len(keywords)
-    end = ((deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size)%len(keywords)
+    start = ((deviceIndex*samples_per_device) + (batch_index * batch_size))#%len(keywords)
+    end = ((deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size)#%len(keywords)
 
     if debug: print(f"[{device.port}] Sending samples from {start} to {end}")
 
-    files = keywords[start:end]
-    for i, filename in enumerate(files):
+    # files = keywords[start:end]
+    for i in range(start, end):
+        filename = keywords[i % len(keywords)]
         keyword = filename.split(".")[0]
         num_button = keywords_buttons[keyword]
 
-        if debug: print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
+        if debug: print(f"[{device.port}] Sending sample {filename} ({i}/{end-start}): Button {num_button}")
         error, success = sendSample(device, 'datasets/keywords/'+filename, num_button, deviceIndex)
         successes_queue_map[deviceIndex].put(success)
         errors_queue_map[deviceIndex].put(error)
-        accuracy_map[deviceIndex].append(sum(successes_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue))
+        samplesAccuracyTick = sum(successes_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue)
+        print("Samples accuracy tick: {samplesAccuracyTick}")
+        accuracy_map[deviceIndex].append(samplesAccuracyTick)
 
 def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
     global montserrat_files, pedraforca_files, blau_files, verd_files, vermell_files
@@ -157,7 +158,9 @@ def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False
         only_forward_conf = device.readline().decode()
         if debug: print(f"[{device.port}] Only forward confirmation: {only_forward_conf}") # Button confirmation
 
-        for i, value in enumerate(data['payload']['values']): device.write(struct.pack('h', value))
+        for i, value in enumerate(data['payload']['values']): 
+            device.write(struct.pack('h', value))
+            # device.read()
 
         sample_received_conf = device.readline().decode()
         if debug: print(f"[{device.port}] Sample received confirmation:", sample_received_conf)
@@ -204,7 +207,9 @@ def sendTestAllDevices():
     return test_accuracies_map
 
 def read_graph(device, deviceIndex):
-    outputs = device.readline().decode().split()
+    outputs = device.readline()
+    print(f'[{device.port}] Outputs [raw]: {outputs}')
+    outputs = outputs.decode().split()
     print(f'[{device.port}] Outputs: {outputs}')
 
     bpred = outputs.index(max(outputs))+1
@@ -390,7 +395,7 @@ def deScaleWeight(min_w, max_w, weight):
 
 def scaleWeight(min_w, max_w, weight):
     a, b = getScaleRange()
-    return int(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ))
+    return round(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ))
 
 
 def getScaleRange():

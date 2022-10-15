@@ -30,8 +30,8 @@ const float threshold = 0.6;
 
 uint16_t num_epochs = 0;
 
-bool mixed_precision = false;
-typedef int32_t scaledType;
+bool mixed_precision = true;
+typedef int8_t scaledType;
 
 /**
  * @brief      Arduino setup function
@@ -204,6 +204,7 @@ void receiveSampleAndTrain() {
         Serial.readBytes(ref, 2);
         inference.buffer[i] = 0;
         inference.buffer[i] = (ref[1] << 8) | ref[0];
+        // Serial.write(1);
     }
     Serial.println("Sample received for button " + String(num_button));
     train(num_button, only_forward);
@@ -302,7 +303,7 @@ void startFL() {
 float scaleWeight(float min_w, float max_w, float weight) {
     float a, b;
     getScaleRange(a, b);
-    return a + ( (weight-min_w)*(b-a) / (max_w-min_w) );
+    return round(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ));
 }
 
 float deScaleWeight(float min_w, float max_w, scaledType weight) {
