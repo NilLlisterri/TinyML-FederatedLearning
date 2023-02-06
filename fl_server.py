@@ -12,56 +12,69 @@ import json
 import os
 import random
 from queue import Queue
+from scipy.io import wavfile
+# import tensorflow as tf
 
 seed = 4321
 random.seed(seed)
 np.random.seed(seed)
 
-mixedPrecision = True
+mixedPrecision = False
 scaledWeightsSize = 1
-samples_per_device = 500 # Amount of samples of each word to send to each device
-batch_size = 10 # Must be even, has to be split into 3 types of samples
+samples_per_device = 1200 # Amount of samples of each word to send to each device
+batch_size = 1200 # Must be even, has to be split into 3 types of samples
 experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
-
+enableFL = True
 debug = True
 
 keywords_buttons = {
-    "montserrat": 1,
-    "pedraforca": 2,
-    "vermell": 3,
-    "blau": 4,
-    # "verd": 5
+    # "montserrat": 1,
+    # "pedraforca": 2,
+    # "vermell": 3,
+    # "blau": 4,
+    # "verd": 5,
+    "up": 1,
+    "backward": 2,
+    "forward": 3,
+    "down": 4,
+    #"left": 3,
+    #"right": 4
 }
 
-output_nodes = len(keywords_buttons)
+output_nodes = 4 # len(keywords_buttons)
 test_samples_amount = 60
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*output_nodes
 momentum = 0.9
-learningRate= 0.6
+learningRate= 0.0005
 pauseListen = False # So there are no threads reading the serial input at the same time
 
-montserrat_files = [file for file in os.listdir("datasets/keywords") if file.startswith("montserrat")]
-pedraforca_files = [file for file in os.listdir("datasets/keywords") if file.startswith("pedraforca")]
-vermell_files = [file for file in os.listdir("datasets/keywords") if file.startswith("vermell")]
-blau_files = [file for file in os.listdir("datasets/keywords") if file.startswith("blau")]
-verd_files = [file for file in os.listdir("datasets/keywords") if file.startswith("verd")]
 
-test_montserrat_files = [file for file in os.listdir("datasets/test-keywords/") if file.startswith("montserrat")]
-test_pedraforca_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("pedraforca")]
-test_blau_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("blau")]
-test_verd_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("verd")]
-test_vermell_files = [file for file in os.listdir("datasets/test-keywords") if file.startswith("vermell")]
+samples_folder = "./datasets/keywords_v2"
+# samples_folder = "./datasets/keywords"
 
-random.shuffle(montserrat_files)
-random.shuffle(pedraforca_files)
-random.shuffle(blau_files)
-random.shuffle(verd_files)
-random.shuffle(vermell_files)
+words = list(keywords_buttons.keys())
 
-keywords = list(sum(zip(montserrat_files, pedraforca_files, vermell_files, blau_files), ()))
-test_keywords = list(sum(zip(test_montserrat_files, test_pedraforca_files, test_vermell_files, test_blau_files), ()))
+files = []
+test_files = []
+for i, word in enumerate(words):
+    file_list = os.listdir(f"{samples_folder}/{word}")
+    random.shuffle(file_list)
+    files.append(list(map(lambda f: f"{word}/{f}", file_list[0:1000])))
+    test_files.append(list(map(lambda f: f"{word}/{f}", [file for file in file_list[1000:1500]])))
+
+
+keywords = list(sum(zip(*files), ()))
+test_keywords = list(sum(zip(*test_files), ()))
+
+if debug: print(f"Total training keywords: {len(keywords)}")
+
+# random.shuffle(keywords)
+
+#samplerate, data = wavfile.read(f"{samples_folder}/{keywords[0]}")
+#print(min(data), max(data))
+#quit()
 
 def print_until_keyword(keyword, arduino):
     while True: 
@@ -95,21 +108,18 @@ def init_network(hidden_layer, output_layer, device):
     
 # Batch size: The amount of samples to send
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
-    global montserrat_files, pedraforca_files, keywords
-
     start = ((deviceIndex*samples_per_device) + (batch_index * batch_size))#%len(keywords)
     end = ((deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size)#%len(keywords)
 
     if debug: print(f"[{device.port}] Sending samples from {start} to {end}")
 
-    # files = keywords[start:end]
     for i in range(start, end):
         filename = keywords[i % len(keywords)]
-        keyword = filename.split(".")[0]
+        keyword = filename.split("/")[0]
         num_button = keywords_buttons[keyword]
 
         if debug: print(f"[{device.port}] Sending sample {filename} ({i}/{end-start}): Button {num_button}")
-        error, success = sendSample(device, 'datasets/keywords/'+filename, num_button, deviceIndex)
+        error, success = sendSample(device, f"{samples_folder}/{filename}", num_button, deviceIndex) # 'datasets/keywords/'
         successes_queue_map[deviceIndex].put(success)
         errors_queue_map[deviceIndex].put(error)
         samplesAccuracyTick = sum(successes_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue)
@@ -144,7 +154,6 @@ def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
 def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False):
     with open(samplePath) as f:
         ini_time = time.time() * 1000
-        data = json.load(f)
         if debug: print(f'[{device.port}] Sending train command')
         device.write(b't')
         startConfirmation = device.readline().decode()
@@ -158,7 +167,13 @@ def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False
         only_forward_conf = device.readline().decode()
         if debug: print(f"[{device.port}] Only forward confirmation: {only_forward_conf}") # Button confirmation
 
-        for i, value in enumerate(data['payload']['values']): 
+        if samplePath.endswith('.wav'):
+            samplerate, values = wavfile.read(f"{samples_folder}/{keywords[0]}")
+        elif samplePath.endswith('.json'):
+            data = json.load(f)
+            values = data['payload']['values']
+        
+        for value in values:
             device.write(struct.pack('h', value))
             # device.read()
 
@@ -289,7 +304,6 @@ def plot_mse_graph():
 
     plt.pause(2)
 
-    
 
 def listenDevice(device, deviceIndex):
     global pauseListen, graph
@@ -359,7 +373,7 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
             # if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
-        if debug and i % 1000 == 0 and d.port == 'com6': print(f"[{d.port}] Received Weight {i}: {weight}")
+        if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_hidden_layer[device_index][i] = weight
 
     for i in range(size_output_layer): # output layer
@@ -371,7 +385,7 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
             #if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
-        if debug and i % 1000 == 0 and d.port == 'com6': print(f"[{d.port}] Received Weight {i}: {weight}")
+        if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_output_layer[device_index][i] = weight
 
     print(f"[{d.port}] Model received from {d.port} ({time.time()-ini_time} seconds)")
@@ -396,7 +410,6 @@ def deScaleWeight(min_w, max_w, weight):
 def scaleWeight(min_w, max_w, weight):
     a, b = getScaleRange()
     return round(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ))
-
 
 def getScaleRange():
     if scaledWeightsSize == 1:
@@ -458,8 +471,6 @@ def startFL():
  
     for thread in threads: thread.join() # Wait for all the threads to end
 
-    print(devices_hidden_layer)
-
     # Processing models
 
     # if sum == 0, any device made any epoch
@@ -488,6 +499,11 @@ def startFL():
 def sendInitWeights():
     threads = []
     for i, d in enumerate(devices):
+        # Xavier / Glorot initializer
+        # initializer = tf.keras.initializers.GlorotUniform(seed=seed)
+        # hidden_layer = initializer(shape=(1, size_hidden_layer))[0]
+        # output_layer = initializer(shape=(1, size_output_layer))[0]
+
         hidden_layer = np.random.uniform(-0.5,0.5, size_hidden_layer).astype('float32')
         output_layer = np.random.uniform(-0.5, 0.5, size_output_layer).astype('float32')
 
@@ -529,7 +545,7 @@ if experiment != None:
         for thread in threads: thread.join() # Wait for all the threads to end
         print(f'Batch time: {time.time() - batch_ini_time} seconds)')
         fl_ini_time = time.time()
-        startFL()
+        if enableFL: startFL()
         print(f'FL time: {time.time() - fl_ini_time} seconds)')
         time.sleep(1)
 
@@ -554,7 +570,7 @@ plt.ylim(bottom=0, top=1)
 plt.xlim(left=0)
 plt.autoscale(axis='x')
 for device_index, device in enumerate(devices):
-   plt.plot(accuracy_map[device_index], label=f"Device {device_index}")
+  plt.plot(accuracy_map[device_index], label=f"Device {device_index}")
 
 if experiment != None:
     # figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.png"

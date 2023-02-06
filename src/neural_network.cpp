@@ -5,9 +5,19 @@
 #include "neural_network.h"
 #include <math.h>
 
+float sigmoid(float x) {
+    return 1.0 / (1.0 + exp(-x));
+}
+
+float relu(float x) {
+    return max(0, x);
+}
+
 void NeuralNetwork::initialize(float LearningRate, float Momentum) {
     this->LearningRate = LearningRate;
     this->Momentum = Momentum;
+
+    this->activation = &sigmoid;
 }
 
 float NeuralNetwork::forward(const float Input[], const float Target[]){
@@ -19,7 +29,7 @@ float NeuralNetwork::forward(const float Input[], const float Target[]){
         for (int j = 0; j < InputNodes; j++) {
             Accum += Input[j] * HiddenWeights[j*HiddenNodes + i];
         }
-        Hidden[i] = 1.0 / (1.0 + exp(-Accum));
+        Hidden[i] = this->activation(Accum);
     }
 
     // Compute output layer activations and calculate errors
@@ -28,7 +38,7 @@ float NeuralNetwork::forward(const float Input[], const float Target[]){
         for (int j = 0; j < HiddenNodes; j++) {
             Accum += Hidden[j] * OutputWeights[j*OutputNodes + i];
         }
-        Output[i] = 1.0 / (1.0 + exp(-Accum));
+        Output[i] = this->activation(Accum);
         error += (1.0/OutputNodes) * (Target[i] - Output[i]) * (Target[i] - Output[i]);
     }
     return error;
@@ -44,7 +54,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         for (int j = 0; j < InputNodes; j++) {
             Accum += Input[j] * HiddenWeights[j*HiddenNodes + i];
         }
-        Hidden[i] = 1.0 / (1.0 + exp(-Accum));
+        Hidden[i] = this->activation(Accum);
     }
 
     // Compute output layer activations and calculate errors
@@ -53,7 +63,7 @@ float NeuralNetwork::backward(const float Input[], const float Target[]){
         for (int j = 0; j < HiddenNodes; j++) {
             Accum += Hidden[j] * OutputWeights[j*OutputNodes + i];
         }
-        Output[i] = 1.0 / (1.0 + exp(-Accum));
+        Output[i] = this->activation(Accum);
         OutputDelta[i] = (Target[i] - Output[i]) * Output[i] * (1.0 - Output[i]);
         error += (1.0/OutputNodes) * (Target[i] - Output[i]) * (Target[i] - Output[i]);
     }

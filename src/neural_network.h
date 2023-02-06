@@ -34,7 +34,6 @@ class NeuralNetwork {
         // float asd[500] = {};
         
     private:
-
         float Hidden[HiddenNodes] = {};
         float Output[OutputNodes] = {};
         float HiddenWeights[(InputNodes+1) * HiddenNodes] = {};
@@ -44,9 +43,11 @@ class NeuralNetwork {
         float ChangeHiddenWeights[(InputNodes+1) * HiddenNodes] = {};
         float ChangeOutputWeights[(HiddenNodes+1) * OutputNodes] = {};
 
+        float (*activation)(float);
+
         float Error;
-        float LearningRate = 0.3;
-        float Momentum = 0.9;
+        float LearningRate;
+        float Momentum;
 };
 
 
