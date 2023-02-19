@@ -30,7 +30,7 @@ const float threshold = 0.6;
 
 uint16_t num_epochs = 0;
 
-bool mixed_precision = false;
+bool mixed_precision = true;
 typedef int8_t scaledType;
 
 /**

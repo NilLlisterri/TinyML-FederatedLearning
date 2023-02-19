@@ -13,68 +13,54 @@ import os
 import random
 from queue import Queue
 from scipy.io import wavfile
+import sys
 # import tensorflow as tf
 
 seed = 4321
 random.seed(seed)
 np.random.seed(seed)
 
-mixedPrecision = False
-scaledWeightsSize = 1
-samples_per_device = 1200 # Amount of samples of each word to send to each device
-batch_size = 1200 # Must be even, has to be split into 3 types of samples
-experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
+# Keyword samples split
+samples_folder = "./datasets/keywords_v3"
+train_samples = 160 # Number of samples for training of each keyword
+test_samples = 20   # Number of samples for training of each keyword
+
+# Experiment sizes
+training_epochs = 120   # Amount of training epochs. Can't be more than kws * train_samples
+testing_epochs = 60     # Amount of test samples of each keyword. Can't be more than kws * test_samples
+
+# Federated learning
 enableFL = True
+batch_size = 12          # Must be divisble by the amount of keywords
+mixedPrecision = True
+scaledWeightsSize = 1
+
+experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
 debug = True
+pauseListen = False # So there are no threads reading the serial input at the same time
 
-keywords_buttons = {
-    # "montserrat": 1,
-    # "pedraforca": 2,
-    # "vermell": 3,
-    # "blau": 4,
-    # "verd": 5,
-    "up": 1,
-    "backward": 2,
-    "forward": 3,
-    "down": 4,
-    #"left": 3,
-    #"right": 4
-}
-
+# NN Parameters
 output_nodes = 4 # len(keywords_buttons)
-test_samples_amount = 60
 size_hidden_nodes = 25
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*output_nodes
 momentum = 0.9
-learningRate= 0.0005
-pauseListen = False # So there are no threads reading the serial input at the same time
+learningRate= 0.05
 
+keywords_buttons = {
+    "montserrat": 1,
+    "pedraforca": 2,
+    "vermell": 3,
+    "blau": 4,
+    # "verd": 5,
+    # "up": 1,
+    # "backward": 2,
+    # "forward": 3,
+    #"down": 4,
+    #"left": 3,
+    #"right": 4
+}
 
-samples_folder = "./datasets/keywords_v2"
-# samples_folder = "./datasets/keywords"
-
-words = list(keywords_buttons.keys())
-
-files = []
-test_files = []
-for i, word in enumerate(words):
-    file_list = os.listdir(f"{samples_folder}/{word}")
-    random.shuffle(file_list)
-    files.append(list(map(lambda f: f"{word}/{f}", file_list[0:1000])))
-    test_files.append(list(map(lambda f: f"{word}/{f}", [file for file in file_list[1000:1500]])))
-
-
-keywords = list(sum(zip(*files), ()))
-test_keywords = list(sum(zip(*test_files), ()))
-
-if debug: print(f"Total training keywords: {len(keywords)}")
-
-# random.shuffle(keywords)
-
-#samplerate, data = wavfile.read(f"{samples_folder}/{keywords[0]}")
-#print(min(data), max(data))
-#quit()
 
 def print_until_keyword(keyword, arduino):
     while True: 
@@ -82,7 +68,7 @@ def print_until_keyword(keyword, arduino):
         if msg[:-2] == keyword: break
         else: print(f'({arduino.port}):',msg, end='')
 
-def init_network(hidden_layer, output_layer, device):
+def initDevice(hidden_layer, output_layer, device):
     device.reset_input_buffer()
     device.write(b's')
     print_until_keyword('start', device)
@@ -108,23 +94,23 @@ def init_network(hidden_layer, output_layer, device):
     
 # Batch size: The amount of samples to send
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
-    start = ((deviceIndex*samples_per_device) + (batch_index * batch_size))#%len(keywords)
-    end = ((deviceIndex*samples_per_device) + (batch_index * batch_size) + batch_size)#%len(keywords)
+    start = ((deviceIndex*training_epochs) + (batch_index * batch_size)) #%len(keywords)
+    end = ((deviceIndex*training_epochs) + (batch_index * batch_size) + batch_size) #%len(keywords)
 
-    if debug: print(f"[{device.port}] Sending samples from {start} to {end}")
+    if debug: print(f"[{device.port}] Sending samples of batch {batch_index}, from {start} to {end}")
 
     for i in range(start, end):
         filename = keywords[i % len(keywords)]
         keyword = filename.split("/")[0]
         num_button = keywords_buttons[keyword]
 
-        if debug: print(f"[{device.port}] Sending sample {filename} ({i}/{end-start}): Button {num_button}")
+        if debug: print(f"[{device.port}] Sending sample {i} ({i-start}/{end-start})")
         error, success = sendSample(device, f"{samples_folder}/{filename}", num_button, deviceIndex) # 'datasets/keywords/'
-        successes_queue_map[deviceIndex].put(success)
-        errors_queue_map[deviceIndex].put(error)
-        samplesAccuracyTick = sum(successes_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue)
-        print("Samples accuracy tick: {samplesAccuracyTick}")
-        accuracy_map[deviceIndex].append(samplesAccuracyTick)
+        successes_map[deviceIndex].put(success)
+        training_errors_map[deviceIndex].append(error)
+        samplesAccuracyTick = sum(successes_map[deviceIndex].queue)/len(successes_map[deviceIndex].queue)
+        # if debug: print(f"[{device.port}] Samples accuracy tick: {samplesAccuracyTick}")
+        training_accuracy_map[deviceIndex].append(samplesAccuracyTick)
 
 def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
     global montserrat_files, pedraforca_files, blau_files, verd_files, vermell_files
@@ -147,25 +133,25 @@ def sendSamplesNonIID(device, deviceIndex, batch_size, batch_index):
     for i, filename in enumerate(files):
         print(f"[{device.port}] Sending sample {filename} ({i}/{len(files)}): Button {num_button}")
         error, success = sendSample(device, f"datasets/keywords/{filename}", num_button, deviceIndex)
-        successes_queue_map[deviceIndex].put(success)
-        errors_queue_map[deviceIndex].put(error)
-        accuracy_map[deviceIndex].append(sum(successes_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue))
+        successes_map[deviceIndex].put(success)
+        training_errors_map[deviceIndex].put(error)
+        training_accuracy_map[deviceIndex].append(sum(successes_map[deviceIndex].queue)/len(training_errors_map[deviceIndex].queue))
 
 def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False):
     with open(samplePath) as f:
         ini_time = time.time() * 1000
-        if debug: print(f'[{device.port}] Sending train command')
+        # if debug: print(f'[{device.port}] Sending train command')
         device.write(b't')
         startConfirmation = device.readline().decode()
-        if debug: print(f"[{device.port}] Train start confirmation:", startConfirmation)
+        #if debug: print(f"[{device.port}] Train start confirmation:", startConfirmation)
 
         device.write(struct.pack('B', num_button))
         button_confirmation = device.readline().decode() # Button confirmation
-        if debug: print(f"[{device.port}] Button confirmation: {button_confirmation}")
+        # if debug: print(f"[{device.port}] Button confirmation: {button_confirmation}")
 
         device.write(struct.pack('B', 1 if only_forward else 0))
         only_forward_conf = device.readline().decode()
-        if debug: print(f"[{device.port}] Only forward confirmation: {only_forward_conf}") # Button confirmation
+        # if debug: print(f"[{device.port}] Only forward confirmation: {only_forward_conf}") # Button confirmation
 
         if samplePath.endswith('.wav'):
             samplerate, values = wavfile.read(f"{samples_folder}/{keywords[0]}")
@@ -178,60 +164,57 @@ def sendSample(device, samplePath, num_button, deviceIndex, only_forward = False
             # device.read()
 
         sample_received_conf = device.readline().decode()
-        if debug: print(f"[{device.port}] Sample received confirmation:", sample_received_conf)
+        # if debug: print(f"[{device.port}] Sample received confirmation:", sample_received_conf)
 
         graphCommand = device.readline().decode()
-        if debug: print(f"[{device.port}] Graph command received: {graphCommand}")
+        # if debug: print(f"[{device.port}] Graph command received: {graphCommand}")
         error, num_button_predicted = read_graph(device, deviceIndex)
-        if debug: print(f'[{device.port}] Sample sent in: {(time.time()*1000)-ini_time} milliseconds)')
+        # if debug: print(f'[{device.port}] Sample sent in: {(time.time()*1000)-ini_time} milliseconds)')
 
     return error, num_button == num_button_predicted
 
-def sendTestSamples(device, deviceIndex, test_accuracies_map):
-    global test_keywords
+def sendTestSamples(device, deviceIndex):
+    global test_keywords, test_accuracies_map, test_errors_map
 
     errors_queue = Queue()
     successes_queue = Queue()
 
-    start = deviceIndex*test_samples_amount
-    end = (deviceIndex*test_samples_amount) + test_samples_amount
-
-    if debug: print(f"[{device.port}] Sending test samples from {start} to {end}")
-   
-    for i, filename in enumerate(test_keywords[start:end]):
-        keyword = filename.split(".")[0]
+    if debug: print(f"[{device.port}] Sending {testing_epochs} test samples")
+    for i, filename in enumerate(test_keywords[:testing_epochs]):
+        if debug: print(f"[{device.port}] Sending test sample {i}/{testing_epochs}")
+        keyword = filename.split("/")[0]
         num_button = keywords_buttons[keyword]
         
-        error, success = sendSample(device, 'datasets/test-keywords/'+filename, num_button, deviceIndex, True)
+        error, success = sendSample(device, 'datasets/keywords_v3/'+filename, num_button, deviceIndex, True)
         errors_queue.put(error)
         successes_queue.put(success)
     
     test_accuracy = sum(successes_queue.queue)/len(successes_queue.queue)
+    test_error = sum(errors_queue.queue)/len(errors_queue.queue)
     print(f"[{device.port}] Testing accuracy: {test_accuracy}")
-    test_accuracies_map[deviceIndex] = test_accuracy
+    print(f"[{device.port}] Testing MSE: {test_error}")
+    test_accuracies_map[deviceIndex].append(test_accuracy)
+    test_errors_map[deviceIndex].append(test_error)
 
 def sendTestAllDevices():
-    test_accuracies_map = {}
     global devices
+    threads = []
     for deviceIndex, device in enumerate(devices):
-        thread = threading.Thread(target=sendTestSamples, args=(device, deviceIndex, test_accuracies_map))
+        thread = threading.Thread(target=sendTestSamples, args=(device, deviceIndex))
         thread.daemon = True
         thread.start()
         threads.append(thread)
     for thread in threads: thread.join()
-    return test_accuracies_map
 
 def read_graph(device, deviceIndex):
-    outputs = device.readline()
-    print(f'[{device.port}] Outputs [raw]: {outputs}')
-    outputs = outputs.decode().split()
-    print(f'[{device.port}] Outputs: {outputs}')
+    outputs = device.readline().decode().split()
+    # print(f'[{device.port}] Outputs: {outputs}')
 
-    bpred = outputs.index(max(outputs))+1
-    if debug: print(f'[{device.port}] Predicted button: {bpred}')
+    predicted_button = outputs.index(max(outputs))+1
+    # if debug: print(f'[{device.port}] Predicted button: {predicted_button}')
     
     error = device.readline().decode()
-    print(f"[{device.port}] Error: {error}")
+    # print(f"[{device.port}] Error: {error}")
 
     ne = device.readline()[:-2]
     n_epooch = int(ne)
@@ -242,10 +225,9 @@ def read_graph(device, deviceIndex):
     graph.append([n_epooch, n_error, deviceIndex])
     return n_error, outputs.index(max(outputs)) + 1
 
-def read_number(msg):
+def read_number_devices(msg):
     while True:
         try:
-            #return 2;
             return int(input(msg))
         except: print("ERROR: Not a number")
 
@@ -253,7 +235,6 @@ def read_port(msg):
     while True:
         try:
             port = input(msg)
-            #port = "COM8";
             return serial.Serial(port, 9600)
         except: print(f"ERROR: Wrong port connection ({port})")
 
@@ -300,7 +281,7 @@ def plot_mse_graph():
     #plt.xlim = epochs
     #plt.xticks(range(0, epochs))
 
-    if (experiment == 'train-test'): plt.axvline(x=samples_per_device)
+    if (experiment == 'train-test'): plt.axvline(x=training_epochs)
 
     plt.pause(2)
 
@@ -318,32 +299,25 @@ def listenDevice(device, deviceIndex):
             elif msg[:-2] == 'start_fl': startFL()
 
 def getDevices():
-    global devices, devices_connected
-    num_devices = read_number("Number of devices: ")
-    # num_devices = 2
-
+    num_devices = read_number_devices("Number of devices: ")
     available_ports = comports()
     print("Available ports:")
     for available_port in available_ports: print(available_port)
-
     devices = [read_port(f"Port device_{i+1}: ") for i in range(num_devices)]
-    devices_connected = devices
+    return devices;
 
 def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
     global size_hidden_layer, size_output_layer
-    #d.reset_input_buffer()
-    #d.reset_output_buffer()
-    #d.timeout = 5
 
-    print(f'[{d.port}] Starting connection...') # Handshake
+    # if debug: print(f'[{d.port}] Starting connection...') # Handshake
     d.write(b'>') # Python --> SYN --> Arduino
     syn_ack = d.read()
-    print(f'[{d.port}] syn_ack: {syn_ack}') # Handshake
+    # if debug: print(f'[{d.port}] syn_ack: {syn_ack}') # Handshake
 
     # if d.read() == b'<': # Python <-- SYN ACK <-- Arduino
     d.write(b's') # Python --> ACK --> Arduino
     
-    print(f"[{d.port}] Connection accepted.")
+    # if debug: print(f"[{d.port}] Connection accepted.")
     devices_connected.append(d)
     d.timeout = None
 
@@ -356,11 +330,11 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
     max_w = readFloat(d)
 
     # print(f"[{d.port}] Scaled weight size: {scaledWeightsSize}")
-    print(f"[{d.port}] Min weight: {min_w}, max weight: {max_w}")
+    # if debug: print(f"[{d.port}] Min weight: {min_w}, max weight: {max_w}")
     a, b = getScaleRange()
-    print(f"[{d.port}] Scaling precision: {(abs(max_w-min_w)) / abs(a-b)}")
+    # if debug: print(f"[{d.port}] Scaling precision: {(abs(max_w-min_w)) / abs(a-b)}")
 
-    if debug: print(f"[{d.port}] Receiving model...")
+    # if debug: print(f"[{d.port}] Receiving model...")
     ini_time = time.time()
 
     for i in range(size_hidden_layer): # hidden layer
@@ -373,7 +347,7 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
             # if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
-        if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
+        # if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_hidden_layer[device_index][i] = weight
 
     for i in range(size_output_layer): # output layer
@@ -385,7 +359,7 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
             #if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
-        if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
+        # if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_output_layer[device_index][i] = weight
 
     print(f"[{d.port}] Model received from {d.port} ({time.time()-ini_time} seconds)")
@@ -422,14 +396,14 @@ def getScaleRange():
 def sendModel(d, hidden_layer, output_layer):
     min_w = min(min(hidden_layer), min(output_layer))
     max_w = max(max(hidden_layer), max(output_layer))
-    print(f"[{d.port}] Min weight to send: {min_w}, max: {max_w}")
+    # if debug: print(f"[{d.port}] Min weight to send: {min_w}, max: {max_w}")
     
     d.write(struct.pack('f', min_w))
     d.write(struct.pack('f', max_w))
 
     ini_time = time.time()
     for i in range(size_hidden_layer): # hidden layer
-        if i < 5: print(f"[{d.port}] Sending weight {i}: {hidden_layer[i]}")
+        # if debug and i < 5: print(f"[{d.port}] Sending weight {i}: {hidden_layer[i]}")
         if mixedPrecision:
             scaled = scaleWeight(min_w, max_w, hidden_layer[i])
             d.write(scaled.to_bytes(scaledWeightsSize, "little", signed=True))
@@ -445,9 +419,9 @@ def sendModel(d, hidden_layer, output_layer):
             float_num = output_layer[i]
             d.write(struct.pack('f', float_num))
 
-    if debug: print(f'Model sent to {d.port} ({time.time()-ini_time} seconds)')
+    # if debug: print(f'Model sent to {d.port} ({time.time()-ini_time} seconds)')
     confirmation = d.readline().decode()
-    if debug: print(f'Model received confirmation: {confirmation}')
+    # if debug: print(f'Model received confirmation: {confirmation}')
 
 def startFL():
     global devices_connected, hidden_layer, output_layer, pauseListen
@@ -474,7 +448,7 @@ def startFL():
     # Processing models
 
     # if sum == 0, any device made any epoch
-    if debug: print(f"Devices num epochs: {devices_num_epochs}")
+    # if debug: print(f"Devices num epochs: {devices_num_epochs}")
     if sum(devices_num_epochs) > 0:
         # We can use weights to change the importance of each device
         # example weights = [1, 0.5] -> giving more importance to the first device...
@@ -495,8 +469,10 @@ def startFL():
     for thread in threads: thread.join() # Wait for all the threads to end
     pauseListen = False
 
+    if debug: print("Federated learning ended")
+
 # Send the blank model to all the devices
-def sendInitWeights():
+def initializeDevices():
     threads = []
     for i, d in enumerate(devices):
         # Xavier / Glorot initializer
@@ -507,60 +483,100 @@ def sendInitWeights():
         hidden_layer = np.random.uniform(-0.5,0.5, size_hidden_layer).astype('float32')
         output_layer = np.random.uniform(-0.5, 0.5, size_output_layer).astype('float32')
 
-        thread = threading.Thread(target=init_network, args=(hidden_layer, output_layer, d))
+        thread = threading.Thread(target=initDevice, args=(hidden_layer, output_layer, d))
         thread.daemon = True
         thread.start()
         threads.append(thread)
     for thread in threads: thread.join() # Wait for all the threads to end
 
 
-getDevices()
 
-sendInitWeights()
 
-accuracy_map = {}
-for deviceIndex, device in enumerate(devices): accuracy_map[deviceIndex] = []
+devices_connected = devices = getDevices()
+
+# Load the dataset
+words = list(keywords_buttons.keys())
+files = []
+test_files = []
+for i, word in enumerate(words):
+    file_list = os.listdir(f"{samples_folder}/{word}")
+    if (len(file_list) < train_samples + test_samples): 
+        sys.exit(f"Not enough samples for keyword {word}")
+    random.shuffle(file_list)
+    files.append(list(map(lambda f: f"{word}/{f}", file_list[0:train_samples])))
+    test_files.append(list(map(lambda f: f"{word}/{f}", file_list[train_samples:(train_samples+test_samples)])))
+
+keywords = list(sum(zip(*files), ()))
+test_keywords = list(sum(zip(*test_files), ()))
+
+if (training_epochs > len(keywords) / len(devices)):
+    sys.exit(f"Not enough training samples for {training_epochs} training epochs on {len(devices)} devices")
+if (testing_epochs > len(test_keywords)):
+    sys.exit(f"Not enough testing samples for {testing_epochs} testing epochs")
+
+if debug: print(f"Total available training keywords: {len(keywords)}")
+if debug: print(f"Total available testing keywords: {len(test_keywords)}")
+
+initializeDevices()
+
+test_accuracies_map = {}
+test_errors_map = {}
+training_accuracy_map = {}
+training_errors_map = {}
+successes_map = {}          # Booleans
+
+for deviceIndex, device in enumerate(devices): 
+    training_accuracy_map[deviceIndex] = []
+    test_accuracies_map[deviceIndex] = []
+    test_errors_map[deviceIndex] = []
+    training_errors_map[deviceIndex] = [] # MSE errors
+    successes_map[deviceIndex] = Queue() # Amount of right inferences
 
 if experiment != None:
     train_ini_time = time.time()
-    errors_queue_map = {}
-    successes_queue_map = {}
-    for deviceIndex, device in enumerate(devices):
-        errors_queue_map[deviceIndex] = Queue() # MSE errors
-        successes_queue_map[deviceIndex] = Queue() # Amount of right inferences
+    num_batches = int(training_epochs/batch_size)
 
-    threads = []
+    sendTestAllDevices() # Initial accuracy
+
     # Train the device
-    for batch in range(int(samples_per_device/batch_size)):
+    for batch in range(num_batches):
         batch_ini_time = time.time()
+        if debug: print(f"Sending batch {i}/{num_batches}")
+        threads = []
         for deviceIndex, device in enumerate(devices):
-            if experiment == 'iid' or experiment == 'train-test': method = sendSamplesIID
-            elif experiment == 'no-iid': method = sendSamplesNonIID
-
+            method = sendSamplesIID if experiment == 'iid' or experiment == 'train-test' else sendSamplesNonIID
             thread = threading.Thread(target=method, args=(device, deviceIndex, batch_size, batch))
             thread.daemon = True
             thread.start()
             threads.append(thread)
-            
         for thread in threads: thread.join() # Wait for all the threads to end
-        print(f'Batch time: {time.time() - batch_ini_time} seconds)')
+        if debug: print(f'Batch time: {time.time() - batch_ini_time} seconds)')
         fl_ini_time = time.time()
         if enableFL: startFL()
-        print(f'FL time: {time.time() - fl_ini_time} seconds)')
+        if debug: print(f'FL time: {time.time() - fl_ini_time} seconds)')
         time.sleep(1)
 
-    train_time = time.time()-train_ini_time
-    if debug: print(f'Trained in ({train_time} seconds)')
+        #if i % test_every_samples == 0:
+        if debug: print(f"[{device.port}] Sending test samples")
+        # To calculate the accuracy on every epoch
+        sendTestAllDevices()
+
+    if debug: print(f'Trained in ({time.time() - train_ini_time} seconds)')
 
     for deviceIndex, device in enumerate(devices):
-        print(f"[{device.port}] Training loss total: {sum(errors_queue_map[deviceIndex].queue)}")
-        print(f"[{device.port}] Training loss mean: {sum(errors_queue_map[deviceIndex].queue)/len(errors_queue_map[deviceIndex].queue)}")
-        print(f"[{device.port}] Training accuracy: {sum(successes_queue_map[deviceIndex].queue)/len(successes_queue_map[deviceIndex].queue)}")
+        print(f"[{device.port}] Training loss total: {sum(training_errors_map[deviceIndex])}")
+        print(f"[{device.port}] Training loss mean: {sum(training_errors_map[deviceIndex])/len(training_errors_map[deviceIndex])}")
+        print(f"[{device.port}] Training accuracy: {sum(successes_map[deviceIndex].queue)/len(successes_map[deviceIndex].queue)}")
 
 
 if experiment == 'train-test': 
-    test_accuracies_map = sendTestAllDevices()
-    print(test_accuracies_map)
+    sendTestAllDevices()
+
+
+print(f"Training accuracies map: {training_accuracy_map}")
+print(f"Training errors map: {training_errors_map}")
+print(f"Testing accuracies map: {test_accuracies_map}")
+print(f"Testing errors map: {test_errors_map}")
 
 
 
@@ -570,7 +586,8 @@ plt.ylim(bottom=0, top=1)
 plt.xlim(left=0)
 plt.autoscale(axis='x')
 for device_index, device in enumerate(devices):
-  plt.plot(accuracy_map[device_index], label=f"Device {device_index}")
+  #plt.plot(training_accuracy_map[device_index], label=f"Device {device_index}")
+  plt.plot(test_accuracies_map[device_index], label=f"Device {device_index}")
 
 if experiment != None:
     # figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.png"
