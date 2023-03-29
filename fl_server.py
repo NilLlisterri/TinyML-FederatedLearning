@@ -1,7 +1,6 @@
 from ast import keyword
 import serial
 from serial.tools.list_ports import comports
-
 import struct
 import time
 import numpy as np
@@ -16,24 +15,25 @@ from scipy.io import wavfile
 import sys
 # import tensorflow as tf
 
-seed = 4321
+seed = 4789 # 4789
 random.seed(seed)
 np.random.seed(seed)
 
 # Keyword samples split
 samples_folder = "./datasets/keywords_v3"
-train_samples = 160 # Number of samples for training of each keyword
-test_samples = 20   # Number of samples for training of each keyword
+train_samples_split = 160 # Number of samples for training of each keyword
+test_samples_split = 20   # Number of samples for training of each keyword
 
 # Experiment sizes
-training_epochs = 120   # Amount of training epochs. Can't be more than kws * train_samples
-testing_epochs = 60     # Amount of test samples of each keyword. Can't be more than kws * test_samples
+training_epochs = 160   # Amount of training epochs. Can't be more than kws * train_samples_split
+testing_epochs = 60     # Amount of test samples of each keyword. Can't be more than kws * test_samples_split
 
 # Federated learning
 enableFL = True
-batch_size = 12          # Must be divisble by the amount of keywords
+batch_size = 4          # Must be divisble by the amount of keywords
 mixedPrecision = True
-scaledWeightsSize = 1
+scaledWeightsBytes = 1
+scaledWeightBits = 7
 
 experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
 debug = True
@@ -52,13 +52,13 @@ keywords_buttons = {
     "pedraforca": 2,
     "vermell": 3,
     "blau": 4,
-    # "verd": 5,
+    #"verd": 5,
     # "up": 1,
     # "backward": 2,
     # "forward": 3,
-    #"down": 4,
-    #"left": 3,
-    #"right": 4
+    # "down": 4,
+    # "left": 3,
+    # "right": 4
 }
 
 
@@ -80,7 +80,7 @@ def initDevice(hidden_layer, output_layer, device):
     device.write(struct.pack('f', momentum))
 
     for i in range(len(hidden_layer)):
-        if i < 5 and device.port == 'com6': print(f"[{device.port}] Init Weight {i}: {hidden_layer[i]}")
+        # if i < 5 and device.port == 'com6': print(f"[{device.port}] Init Weight {i}: {hidden_layer[i]}")
         device.read() # wait until confirmation of float received
         device.write(struct.pack('f', hidden_layer[i]))
     
@@ -306,7 +306,7 @@ def getDevices():
     devices = [read_port(f"Port device_{i+1}: ") for i in range(num_devices)]
     return devices;
 
-def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
+def getModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
     global size_hidden_layer, size_output_layer
 
     # if debug: print(f'[{d.port}] Starting connection...') # Handshake
@@ -329,33 +329,46 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
     min_w = readFloat(d)
     max_w = readFloat(d)
 
-    # print(f"[{d.port}] Scaled weight size: {scaledWeightsSize}")
-    # if debug: print(f"[{d.port}] Min weight: {min_w}, max weight: {max_w}")
+    # print(f"[{d.port}] Scaled weight size: {scaledWeightsBytes}")
+    if debug: print(f"[{d.port}] Min weight: {min_w}, max weight: {max_w}")
     a, b = getScaleRange()
-    # if debug: print(f"[{d.port}] Scaling precision: {(abs(max_w-min_w)) / abs(a-b)}")
+    if debug: print(f"Scale range: {a} - {b}")
+    if debug: print(f"[{d.port}] Scaling precision: {(abs(max_w-min_w)) / abs(a-b)}")
 
     # if debug: print(f"[{d.port}] Receiving model...")
     ini_time = time.time()
 
+    scaledWeights = []
+    unscaledWeights = []
+
     for i in range(size_hidden_layer): # hidden layer
         if mixedPrecision:
-            scaledWeight = readInt(d, scaledWeightsSize)
+            scaledWeight = readInt(d, scaledWeightsBytes)
+            # if d.port == "com4":
+            #     print(scaledWeight)
+            scaledWeights.append(scaledWeight)
+            # if i % 100 == 0 and debug: print(f"[{d.port}] Received scaled weight: {scaledWeight}")
             #scaled_in_float = readFloat(d)
             # float_weight = readFloat(d)
             weight = deScaleWeight(min_w, max_w, scaledWeight)
-            # if i < 5 and d.port == 'com6': print(f"[{d.port}] Recevied Weight {i}: {float_weight}")
+            unscaledWeights.append(weight)
+            # if i % 100 == 0 and debug: print(f"[{d.port}] Recevied unscaled weight {i}: {weight:.5f}")
             # if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
         # if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_hidden_layer[device_index][i] = weight
+    
+    if debug: print(f"Received hidden layer weights")
 
     for i in range(size_output_layer): # output layer
         if mixedPrecision:
-            scaledWeight = readInt(d, scaledWeightsSize)
+            scaledWeight = readInt(d, scaledWeightsBytes)
+            scaledWeights.append(scaledWeight)
             #scaled_in_float = readFloat(d)
             # float_weight = readFloat(d)
             weight = deScaleWeight(min_w, max_w, scaledWeight)
+            unscaledWeights.append(weight)
             #if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
         
@@ -363,6 +376,9 @@ def FlGetModel(d, device_index, devices_hidden_layer, devices_output_layer, devi
         devices_output_layer[device_index][i] = weight
 
     print(f"[{d.port}] Model received from {d.port} ({time.time()-ini_time} seconds)")
+    # if d.port == "com4":
+    #     print("Weight distribution:")
+    #     print(np.array(np.unique(scaledWeights, return_counts=True)).T)
 
     # if it was not connected before, we dont use the devices' model
     if not d in old_devices_connected:
@@ -375,7 +391,7 @@ def readFloat(d):
     return float_num
 
 def readInt(d, size):
-    return int.from_bytes(d.read(size), "little", signed=True)
+    return int.from_bytes(d.read(size), "little", signed=False)
 
 def deScaleWeight(min_w, max_w, weight):
     a, b = getScaleRange()
@@ -386,12 +402,7 @@ def scaleWeight(min_w, max_w, weight):
     return round(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ))
 
 def getScaleRange():
-    if scaledWeightsSize == 1:
-        return -128, 127
-    elif scaledWeightsSize == 2:
-        return -32768, 32767
-    elif scaledWeightsSize == 4:
-        return -2147483648, 2147483647
+    return 0, pow(2, scaledWeightBits)-1
 
 def sendModel(d, hidden_layer, output_layer):
     min_w = min(min(hidden_layer), min(output_layer))
@@ -406,7 +417,7 @@ def sendModel(d, hidden_layer, output_layer):
         # if debug and i < 5: print(f"[{d.port}] Sending weight {i}: {hidden_layer[i]}")
         if mixedPrecision:
             scaled = scaleWeight(min_w, max_w, hidden_layer[i])
-            d.write(scaled.to_bytes(scaledWeightsSize, "little", signed=True))
+            d.write(scaled.to_bytes(scaledWeightsBytes, "little", signed=False))
         else:
             float_num = hidden_layer[i]
             d.write(struct.pack('f', float_num))
@@ -414,7 +425,7 @@ def sendModel(d, hidden_layer, output_layer):
     for i in range(size_output_layer): # output layer
         if mixedPrecision:
             scaled = scaleWeight(min_w, max_w, output_layer[i])
-            d.write(scaled.to_bytes(scaledWeightsSize, "little", signed=True))
+            d.write(scaled.to_bytes(scaledWeightsBytes, "little", signed=False))
         else:
             float_num = output_layer[i]
             d.write(struct.pack('f', float_num))
@@ -438,7 +449,7 @@ def startFL():
     # Receiving models
     threads = []
     for i, d in enumerate(devices):
-        thread = threading.Thread(target=FlGetModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
+        thread = threading.Thread(target=getModel, args=(d, i, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected))
         thread.daemon = True
         thread.start()
         threads.append(thread)
@@ -446,9 +457,6 @@ def startFL():
     for thread in threads: thread.join() # Wait for all the threads to end
 
     # Processing models
-
-    # if sum == 0, any device made any epoch
-    # if debug: print(f"Devices num epochs: {devices_num_epochs}")
     if sum(devices_num_epochs) > 0:
         # We can use weights to change the importance of each device
         # example weights = [1, 0.5] -> giving more importance to the first device...
@@ -483,12 +491,18 @@ def initializeDevices():
         hidden_layer = np.random.uniform(-0.5,0.5, size_hidden_layer).astype('float32')
         output_layer = np.random.uniform(-0.5, 0.5, size_output_layer).astype('float32')
 
+        # nw = []
+        # for w in hidden_layer:
+        #     nw.append(scaleWeight(min(hidden_layer), max(hidden_layer), w))
+        # print(np.array(np.unique(nw, return_counts=True)).T)
+        # plt.plot(nw)
+        # plt.show()
+
         thread = threading.Thread(target=initDevice, args=(hidden_layer, output_layer, d))
         thread.daemon = True
         thread.start()
         threads.append(thread)
     for thread in threads: thread.join() # Wait for all the threads to end
-
 
 
 
@@ -500,11 +514,11 @@ files = []
 test_files = []
 for i, word in enumerate(words):
     file_list = os.listdir(f"{samples_folder}/{word}")
-    if (len(file_list) < train_samples + test_samples): 
+    if (len(file_list) < train_samples_split + test_samples_split): 
         sys.exit(f"Not enough samples for keyword {word}")
     random.shuffle(file_list)
-    files.append(list(map(lambda f: f"{word}/{f}", file_list[0:train_samples])))
-    test_files.append(list(map(lambda f: f"{word}/{f}", file_list[train_samples:(train_samples+test_samples)])))
+    files.append(list(map(lambda f: f"{word}/{f}", file_list[0:train_samples_split])))
+    test_files.append(list(map(lambda f: f"{word}/{f}", file_list[train_samples_split:(train_samples_split+test_samples_split)])))
 
 keywords = list(sum(zip(*files), ()))
 test_keywords = list(sum(zip(*test_files), ()))
@@ -536,7 +550,9 @@ if experiment != None:
     train_ini_time = time.time()
     num_batches = int(training_epochs/batch_size)
 
-    sendTestAllDevices() # Initial accuracy
+    # if enableFL: startFL() # So I can get the initial weight distribution plot
+
+    # sendTestAllDevices() # Initial accuracy
 
     # Train the device
     for batch in range(num_batches):
@@ -559,7 +575,7 @@ if experiment != None:
         #if i % test_every_samples == 0:
         if debug: print(f"[{device.port}] Sending test samples")
         # To calculate the accuracy on every epoch
-        sendTestAllDevices()
+        # sendTestAllDevices()
 
     if debug: print(f'Trained in ({time.time() - train_ini_time} seconds)')
 
@@ -568,8 +584,10 @@ if experiment != None:
         print(f"[{device.port}] Training loss mean: {sum(training_errors_map[deviceIndex])/len(training_errors_map[deviceIndex])}")
         print(f"[{device.port}] Training accuracy: {sum(successes_map[deviceIndex].queue)/len(successes_map[deviceIndex].queue)}")
 
+sendTestAllDevices()
 
 if experiment == 'train-test': 
+    # None
     sendTestAllDevices()
 
 
@@ -591,7 +609,7 @@ for device_index, device in enumerate(devices):
 
 if experiment != None:
     # figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.png"
-    figname = f"plots/{len(devices)}-{scaledWeightsSize if mixedPrecision else 'no'}.png"
+    figname = f"plots/{len(devices)}-{scaledWeightsBytes if mixedPrecision else 'no'}.png"
     plt.savefig(figname, format='png')
     print(f"Generated {figname}")
 

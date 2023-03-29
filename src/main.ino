@@ -31,7 +31,8 @@ const float threshold = 0.6;
 uint16_t num_epochs = 0;
 
 bool mixed_precision = true;
-typedef int8_t scaledType;
+typedef uint8_t scaledType;
+uint scaled_weights_bits = 7;
 
 /**
  * @brief      Arduino setup function
@@ -74,7 +75,7 @@ void init_network_model() {
         Serial.write('n');
         while(Serial.available() < 4) {}
         for (int n = 0; n < 4; n++) {
-            myHiddenWeights[i*4] = Serial.read();
+            myHiddenWeights[i*4+n] = Serial.read();
         }
     }
 
@@ -242,8 +243,7 @@ void startFL() {
         for (uint16_t i = 0; i < hiddenWeightsAmt; ++i) {
             if (mixed_precision) {
                 scaledType weight = scaleWeight(min_weight, max_weight, float_hidden_weights[i]);
-                scaledType casted = weight;
-                Serial.write((byte*) &casted, sizeof(scaledType));
+                Serial.write((byte*) &weight, sizeof(scaledType));
             } else {
                 Serial.write((byte*) &float_hidden_weights[i], sizeof(float)); // debug
             }
@@ -254,8 +254,7 @@ void startFL() {
         for (uint16_t i = 0; i < outputWeightsAmt; ++i) {
             if (mixed_precision) {
                 scaledType weight = scaleWeight(min_weight, max_weight, float_output_weights[i]);
-                scaledType casted = weight;
-                Serial.write((byte*) &casted, sizeof(scaledType));
+                Serial.write((byte*) &weight, sizeof(scaledType));
             } else {
                 Serial.write((byte*) &float_output_weights[i], sizeof(float)); // debug
             }
@@ -300,7 +299,7 @@ void startFL() {
     }
 }
 
-float scaleWeight(float min_w, float max_w, float weight) {
+scaledType scaleWeight(float min_w, float max_w, float weight) {
     float a, b;
     getScaleRange(a, b);
     return round(a + ( (weight-min_w)*(b-a) / (max_w-min_w) ));
@@ -313,19 +312,8 @@ float deScaleWeight(float min_w, float max_w, scaledType weight) {
 }
 
 void getScaleRange(float &a, float &b) {
-    int scaledWeightSize = sizeof(scaledType);
-    if (scaledWeightSize == 1) {
-        a = -128;
-        b = 127;
-    }
-    else if (scaledWeightSize == 2) {
-        a = -32768;
-        b = 32767;
-    }
-    else if (scaledWeightSize == 4) {
-        a = -2147483648;
-        b = 2147483647;
-    }
+    a = 0;
+    b = std::pow(2, scaled_weights_bits)-1;
 } 
 
 
