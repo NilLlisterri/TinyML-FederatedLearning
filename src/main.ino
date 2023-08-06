@@ -20,19 +20,14 @@ typedef struct {
 static inference_t inference;
 static bool debug_nn = false; // Set this to true to see e.g. features generated from the raw signal
 
-
-//uint8_t num_button = 0; // 0 represents none
-bool button_pressed = false;
-
 // Defaults: 0.3, 0.9
 static NeuralNetwork myNetwork;
-const float threshold = 0.6;
 
 uint16_t num_epochs = 0;
 
 bool mixed_precision = true;
-typedef uint8_t scaledType;
-uint scaled_weights_bits = 7;
+typedef uint16_t scaledType;
+uint scaled_weights_bits = 16;
 
 /**
  * @brief      Arduino setup function
@@ -64,7 +59,7 @@ void init_network_model() {
     Serial.println("start");
     int seed = readInt();
     srand(seed);
-    Serial.println("Seed: " + String(seed));
+    // Serial.println("Seed: " + String(seed));
     float learningRate = readFloat();
     float momentum = readFloat();
 

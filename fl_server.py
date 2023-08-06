@@ -1,9 +1,13 @@
 from ast import keyword
+import warnings
+from matplotlib import figure
+from matplotlib.ticker import MaxNLocator
 import serial
 from serial.tools.list_ports import comports
 import struct
 import time
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import threading
 import time
@@ -25,23 +29,26 @@ train_samples_split = 160 # Number of samples for training of each keyword
 test_samples_split = 20   # Number of samples for training of each keyword
 
 # Experiment sizes
-training_epochs = 160   # Amount of training epochs. Can't be more than kws * train_samples_split
-testing_epochs = 60     # Amount of test samples of each keyword. Can't be more than kws * test_samples_split
+training_epochs = 160     # Amount of training epochs. Can't be more than kws * train_samples_split
+testing_epochs = 60       # Amount of test samples of each keyword. Can't be more than kws * test_samples_split
 
 # Federated learning
 enableFL = True
-batch_size = 4          # Must be divisble by the amount of keywords
+enableTest = True
+enablePlot = False
+batch_size = 4 #90        # Must be divisble by the amount of keywords
 mixedPrecision = True
-scaledWeightsBytes = 1
-scaledWeightBits = 7
+scaledWeightsBytes = 2
+scaledWeightBits = 16
+interactive = True
 
-experiment = 'iid' # 'iid', 'no-iid', 'train-test', None
+experiment = 'iid'        # 'iid', 'no-iid', 'train-test', None
 debug = True
-pauseListen = False # So there are no threads reading the serial input at the same time
+pauseListen = False       # So there are no threads reading the serial input at the same time
 
 # NN Parameters
-output_nodes = 4 # len(keywords_buttons)
-size_hidden_nodes = 25
+output_nodes = 4          # len(keywords_buttons)
+size_hidden_nodes = 50
 size_hidden_layer = (650+1)*size_hidden_nodes
 size_output_layer = (size_hidden_nodes+1)*output_nodes
 momentum = 0.9
@@ -52,35 +59,26 @@ keywords_buttons = {
     "pedraforca": 2,
     "vermell": 3,
     "blau": 4,
-    #"verd": 5,
-    # "up": 1,
-    # "backward": 2,
-    # "forward": 3,
-    # "down": 4,
-    # "left": 3,
-    # "right": 4
 }
 
-
-def print_until_keyword(keyword, arduino):
+def WAIT_until_keyword(keyword, arduino):
     while True: 
         msg = arduino.readline().decode()
         if msg[:-2] == keyword: break
-        else: print(f'({arduino.port}):',msg, end='')
+        # else: print(f'({arduino.port}):',msg, end='')
 
 def initDevice(hidden_layer, output_layer, device):
     device.reset_input_buffer()
     device.write(b's')
-    print_until_keyword('start', device)
+    WAIT_until_keyword('start', device)
     device.write(struct.pack('i', seed))
-    print(f"Seed conf: {device.readline().decode()}")
-    if debug: print(f"[{device.port}] Sending model to {device.port}")
+    # print(f"Seed conf: {device.readline().decode()}")
+    if debug: print(f"[{device.port}] Sending blank model...")
 
     device.write(struct.pack('f', learningRate))
     device.write(struct.pack('f', momentum))
 
     for i in range(len(hidden_layer)):
-        # if i < 5 and device.port == 'com6': print(f"[{device.port}] Init Weight {i}: {hidden_layer[i]}")
         device.read() # wait until confirmation of float received
         device.write(struct.pack('f', hidden_layer[i]))
     
@@ -88,23 +86,23 @@ def initDevice(hidden_layer, output_layer, device):
         device.read() # wait until confirmation of float received
         device.write(struct.pack('f', output_layer[i]))
 
-    if debug: print(f"Model sent to {device.port}")
+    if debug: print(f"[{device.port}] Model sent")
     modelReceivedConfirmation = device.readline().decode()
-    if debug: print(f"[{device.port}] Model received confirmation: ", modelReceivedConfirmation)
+    # if debug: print(f"[{device.port}] Model received confirmation: ", modelReceivedConfirmation)
     
 # Batch size: The amount of samples to send
 def sendSamplesIID(device, deviceIndex, batch_size, batch_index):
     start = ((deviceIndex*training_epochs) + (batch_index * batch_size)) #%len(keywords)
     end = ((deviceIndex*training_epochs) + (batch_index * batch_size) + batch_size) #%len(keywords)
 
-    if debug: print(f"[{device.port}] Sending samples of batch {batch_index}, from {start} to {end}")
+    if debug: print(f"[{device.port}] Sending samples of batch {batch_index + 1}, from {start+1} to {end}")
 
     for i in range(start, end):
         filename = keywords[i % len(keywords)]
         keyword = filename.split("/")[0]
         num_button = keywords_buttons[keyword]
 
-        if debug: print(f"[{device.port}] Sending sample {i} ({i-start}/{end-start})")
+        if debug: print(f"[{device.port}] Sending sample {i+1} ({i+1-start}/{end-start})")
         error, success = sendSample(device, f"{samples_folder}/{filename}", num_button, deviceIndex) # 'datasets/keywords/'
         successes_map[deviceIndex].put(success)
         training_errors_map[deviceIndex].append(error)
@@ -238,54 +236,6 @@ def read_port(msg):
             return serial.Serial(port, 9600)
         except: print(f"ERROR: Wrong port connection ({port})")
 
-
-graph = []
-def plot_mse_graph():
-    global graph, devices
-
-    plt.ion()
-    # plt.title(f"Loss vs Epoch")
-    plt.show()
-
-    font_sm = 13
-    font_md = 16
-    font_xl = 18
-    plt.rc('font', size=font_sm)          # controls default text sizes
-    plt.rc('axes', titlesize=font_sm)     # fontsize of the axes title
-    plt.rc('axes', labelsize=font_md)     # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=font_sm)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=font_sm)    # fontsize of the tick labels
-    plt.rc('legend', fontsize=font_sm)    # legend fontsize
-    plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
-
-    colors = ['r', 'g', 'b', 'y']
-    markers = ['-', '--', ':', '-.']
-    epochs = 1
-    for device_index, device in enumerate(devices):
-        epoch = [x[0] for x in graph if x[2] == device_index]
-        error = [x[1] for x in graph if x[2] == device_index]
-
-        epochs = max(len(error), epochs)
-    
-        plt.plot(error, colors[device_index] + markers[device_index], label=f"Device {device_index}")
-
-    plt.legend()
-    plt.xlim(left=0)
-    plt.ylim(bottom=0, top=0.7)
-    plt.ylabel('Loss') # or Error
-    plt.xlabel('Epoch')
-
-    # plt.axes().set_ylim([0, 0.6])
-    # plt.xlim(bottom=0)
-    plt.autoscale(axis='x')
-    #plt.xlim = epochs
-    #plt.xticks(range(0, epochs))
-
-    if (experiment == 'train-test'): plt.axvline(x=training_epochs)
-
-    plt.pause(2)
-
-
 def listenDevice(device, deviceIndex):
     global pauseListen, graph
     while True:
@@ -299,12 +249,19 @@ def listenDevice(device, deviceIndex):
             elif msg[:-2] == 'start_fl': startFL()
 
 def getDevices():
-    num_devices = read_number_devices("Number of devices: ")
-    available_ports = comports()
-    print("Available ports:")
-    for available_port in available_ports: print(available_port)
-    devices = [read_port(f"Port device_{i+1}: ") for i in range(num_devices)]
-    return devices;
+    global learningRate, momentum
+
+    if interactive: 
+        num_devices = read_number_devices("Number of devices: ")
+        print("Available ports: ")
+        for available_port in comports(): print(f"\t{available_port}")
+        devices = [read_port(f"Port for device {i+1}: ") for i in range(num_devices)]
+        learningRate = float(input(f"Learning rate? [{learningRate}]: ") or learningRate)
+        momentum = float(input(f"Momentum? [{momentum}]: ") or momentum)
+    else:
+        num_devices = 3
+        devices = [serial.Serial("com4", 9600), serial.Serial("com8", 9600), serial.Serial("com14", 9600)]
+    return devices
 
 def getModel(d, device_index, devices_hidden_layer, devices_output_layer, devices_num_epochs, old_devices_connected):
     global size_hidden_layer, size_output_layer
@@ -321,25 +278,29 @@ def getModel(d, device_index, devices_hidden_layer, devices_output_layer, device
     devices_connected.append(d)
     d.timeout = None
 
-    print_until_keyword('start', d)
+    WAIT_until_keyword('start', d)
     num_epochs = int(d.readline()[:-2])
     devices_num_epochs.append(num_epochs)
-    print(f"[{d.port}] Num epochs: {num_epochs}")
+    print(f"[{d.port}] New epochs: {num_epochs}")
 
     min_w = readFloat(d)
     max_w = readFloat(d)
 
+    min_weights_map[device_index].append(min_w)
+    max_weights_map[device_index].append(max_w)
+
     # print(f"[{d.port}] Scaled weight size: {scaledWeightsBytes}")
-    if debug: print(f"[{d.port}] Min weight: {min_w}, max weight: {max_w}")
+    if debug: print(f"[{d.port}] Min weight: {round(min_w, 5)}, max weight: {round(max_w, 5)}")
     a, b = getScaleRange()
-    if debug: print(f"Scale range: {a} - {b}")
-    if debug: print(f"[{d.port}] Scaling precision: {(abs(max_w-min_w)) / abs(a-b)}")
+    if debug: print(f"[{d.port}] Quantization scale range: {a} - {b}")
+    if debug: print(f"[{d.port}] Quantization precision: {round((abs(max_w-min_w)) / abs(a-b), 5)}")
 
     # if debug: print(f"[{d.port}] Receiving model...")
     ini_time = time.time()
 
     scaledWeights = []
     unscaledWeights = []
+    unmixedWeights = []
 
     for i in range(size_hidden_layer): # hidden layer
         if mixedPrecision:
@@ -355,30 +316,30 @@ def getModel(d, device_index, devices_hidden_layer, devices_output_layer, device
             # if i % 100 == 0 and debug: print(f"[{d.port}] Recevied unscaled weight {i}: {weight:.5f}")
             # if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
-        
+        unmixedWeights.append(weight)
         # if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_hidden_layer[device_index][i] = weight
     
-    if debug: print(f"Received hidden layer weights")
+    if debug: print(f"[{d.port}] Received hidden layer weights")
 
     for i in range(size_output_layer): # output layer
         if mixedPrecision:
             scaledWeight = readInt(d, scaledWeightsBytes)
             scaledWeights.append(scaledWeight)
-            #scaled_in_float = readFloat(d)
-            # float_weight = readFloat(d)
             weight = deScaleWeight(min_w, max_w, scaledWeight)
             unscaledWeights.append(weight)
             #if abs(float_weight - weight) > 0.3: print(f"[{d.port}] Scaled weight: {scaledWeight} (float: {scaled_in_float}), Float weight (hid): {float_weight}, descaled: {weight}. Difference: {abs(float_weight - weight)}")
         else: weight = readFloat(d)
-        
+        unmixedWeights.append(weight)
         # if debug and i % 100 == 0: print(f"[{d.port}] Received Weight {i}: {weight}")
         devices_output_layer[device_index][i] = weight
 
-    print(f"[{d.port}] Model received from {d.port} ({time.time()-ini_time} seconds)")
-    # if d.port == "com4":
-    #     print("Weight distribution:")
-    #     print(np.array(np.unique(scaledWeights, return_counts=True)).T)
+    print(f"[{d.port}] Model received in {round(time.time()-ini_time, 3)}s")
+    #if d.port == "com14":
+        #print("Weight distribution:")
+        #np.set_printoptions(threshold=sys.maxsize)
+        #print(np.array(np.unique(scaledWeights, return_counts=True)).T)
+        #print(np.array(unmixedWeights))
 
     # if it was not connected before, we dont use the devices' model
     if not d in old_devices_connected:
@@ -404,15 +365,23 @@ def scaleWeight(min_w, max_w, weight):
 def getScaleRange():
     return 0, pow(2, scaledWeightBits)-1
 
+#min_w_progress = []
+#max_w_progress = []
 def sendModel(d, hidden_layer, output_layer):
+    if debug: print(f'[{d.port}] Sending the new model...')
+
     min_w = min(min(hidden_layer), min(output_layer))
     max_w = max(max(hidden_layer), max(output_layer))
+
+    #if d.port == "com4":
+    #    min_w_progress.append(min_w)
+    #    max_w_progress.append(max_w)
     # if debug: print(f"[{d.port}] Min weight to send: {min_w}, max: {max_w}")
     
     d.write(struct.pack('f', min_w))
     d.write(struct.pack('f', max_w))
 
-    ini_time = time.time()
+    if debug: ini_time = time.time()
     for i in range(size_hidden_layer): # hidden layer
         # if debug and i < 5: print(f"[{d.port}] Sending weight {i}: {hidden_layer[i]}")
         if mixedPrecision:
@@ -430,16 +399,19 @@ def sendModel(d, hidden_layer, output_layer):
             float_num = output_layer[i]
             d.write(struct.pack('f', float_num))
 
-    # if debug: print(f'Model sent to {d.port} ({time.time()-ini_time} seconds)')
     confirmation = d.readline().decode()
+    if debug: print(f'[{d.port}] Model sent in {time.time()-ini_time}s')
     # if debug: print(f'Model received confirmation: {confirmation}')
 
 def startFL():
     global devices_connected, hidden_layer, output_layer, pauseListen
 
+    fl_ini_time = time.time()
+    fl_round_epochs.append((batch+1) * batch_size)
+            
     pauseListen = True
 
-    if debug: print('Starting Federated Learning')
+    if debug: print('[MAIN] Starting Federated Learning...')
     old_devices_connected = devices_connected
     devices_connected = []
     devices_hidden_layer = np.empty((len(devices), size_hidden_layer), dtype='float32')
@@ -461,15 +433,14 @@ def startFL():
         # We can use weights to change the importance of each device
         # example weights = [1, 0.5] -> giving more importance to the first device...
         # is like percentage of importance :  sum(a * weights) / sum(weights)
-        ini_time = time.time() * 1000
+        ini_time = time.time()
         hidden_layer = np.average(devices_hidden_layer, axis=0, weights=devices_num_epochs)
         output_layer = np.average(devices_output_layer, axis=0, weights=devices_num_epochs)
-        if debug: print(f'[{d.port}] Average millis: {(time.time()*1000)-ini_time} milliseconds)')
+        if debug: print(f'[{d.port}] Model merged in {round((time.time())-ini_time, 5)}s')
 
     # Sending models
     threads = []
     for d in devices_connected:
-        if debug: print(f'[{d.port}] Sending model...')
         thread = threading.Thread(target=sendModel, args=(d, hidden_layer, output_layer))
         thread.daemon = True
         thread.start()
@@ -477,7 +448,7 @@ def startFL():
     for thread in threads: thread.join() # Wait for all the threads to end
     pauseListen = False
 
-    if debug: print("Federated learning ended")
+    if debug: print(f"[MAIN] Federated learning ended in {round(time.time() - fl_ini_time, 3)}s")
 
 # Send the blank model to all the devices
 def initializeDevices():
@@ -504,6 +475,57 @@ def initializeDevices():
         threads.append(thread)
     for thread in threads: thread.join() # Wait for all the threads to end
 
+graph = []
+fl_round_epochs = []
+def plot(title):
+    global graph, devices, old_graph_size, fl_round_epochs
+
+    warnings.filterwarnings("ignore")
+    ax = plt.figure(figsize=(11, 5)).gca()
+    # ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    font_sm = 13
+    font_md = 16
+    font_xl = 18
+    plt.rc('font', size=font_sm)          # controls default text sizes
+    plt.rc('axes', titlesize=font_sm)     # fontsize of the axes title
+    plt.rc('axes', labelsize=font_md)     # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=font_sm)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=font_sm)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=font_sm)    # legend fontsize
+    plt.rc('figure', titlesize=font_xl)   # fontsize of the figure title
+
+    colors = ['r', 'g', 'b', 'y']
+    markers = ['-', '--', ':', '-.']
+    
+    plt.ion()
+    plt.show(block=False)
+
+    while(True):
+        plt.clf()
+
+        epochs = 1
+        for device_index, device in enumerate(devices):
+            epoch = [x[0] for x in graph if x[2] == device_index]
+            error = [x[1] for x in graph if x[2] == device_index]
+            epochs = max(len(error), epochs)
+            plt.plot(error, colors[device_index] + markers[device_index], label=f"Device {device_index}", marker='o')
+
+        plt.legend()
+        plt.xlim(left=0)
+        plt.ylim(bottom=0, top=0.8)
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.title(title)
+        plt.autoscale(axis='x')
+        # plt.xticks(range(0, epochs))
+
+        if (experiment == 'train-test'): plt.axvline(x=training_epochs)
+
+        for epoch in fl_round_epochs:
+            plt.axvline(epoch - 0.5, linestyle = 'dashed')
+
+        plt.pause(0.1)
+        time.sleep(0.4)
 
 
 devices_connected = devices = getDevices()
@@ -515,7 +537,7 @@ test_files = []
 for i, word in enumerate(words):
     file_list = os.listdir(f"{samples_folder}/{word}")
     if (len(file_list) < train_samples_split + test_samples_split): 
-        sys.exit(f"Not enough samples for keyword {word}")
+        sys.exit(f"[MAIN] Not enough samples for keyword {word}")
     random.shuffle(file_list)
     files.append(list(map(lambda f: f"{word}/{f}", file_list[0:train_samples_split])))
     test_files.append(list(map(lambda f: f"{word}/{f}", file_list[train_samples_split:(train_samples_split+test_samples_split)])))
@@ -524,12 +546,12 @@ keywords = list(sum(zip(*files), ()))
 test_keywords = list(sum(zip(*test_files), ()))
 
 if (training_epochs > len(keywords) / len(devices)):
-    sys.exit(f"Not enough training samples for {training_epochs} training epochs on {len(devices)} devices")
+    sys.exit(f"[MAIN] Not enough training samples for {training_epochs} training epochs on {len(devices)} devices")
 if (testing_epochs > len(test_keywords)):
-    sys.exit(f"Not enough testing samples for {testing_epochs} testing epochs")
+    sys.exit(f"[MAIN] Not enough testing samples for {testing_epochs} testing epochs")
 
-if debug: print(f"Total available training keywords: {len(keywords)}")
-if debug: print(f"Total available testing keywords: {len(test_keywords)}")
+#if debug: print(f"[MAIN] Total available training keywords: {len(keywords)}")
+#if debug: print(f"[MAIN] Total available testing keywords: {len(test_keywords)}")
 
 initializeDevices()
 
@@ -539,25 +561,36 @@ training_accuracy_map = {}
 training_errors_map = {}
 successes_map = {}          # Booleans
 
+min_weights_map = {}
+max_weights_map = {}
+
 for deviceIndex, device in enumerate(devices): 
     training_accuracy_map[deviceIndex] = []
     test_accuracies_map[deviceIndex] = []
     test_errors_map[deviceIndex] = []
     training_errors_map[deviceIndex] = [] # MSE errors
     successes_map[deviceIndex] = Queue() # Amount of right inferences
+    min_weights_map[deviceIndex] = []
+    max_weights_map[deviceIndex] = []
+
+if enablePlot:
+    # Start plotting thread
+    thread = threading.Thread(target=plot, args=["MSE Evolution"])
+    thread.daemon = True
+    thread.start()
+
 
 if experiment != None:
     train_ini_time = time.time()
     num_batches = int(training_epochs/batch_size)
 
     # if enableFL: startFL() # So I can get the initial weight distribution plot
-
-    # sendTestAllDevices() # Initial accuracy
+    # if enableTest: sendTestAllDevices() # Initial accuracy
 
     # Train the device
     for batch in range(num_batches):
         batch_ini_time = time.time()
-        if debug: print(f"Sending batch {i}/{num_batches}")
+        if debug: print(f"[MAIN] Sending batch {batch + 1}/{num_batches}")
         threads = []
         for deviceIndex, device in enumerate(devices):
             method = sendSamplesIID if experiment == 'iid' or experiment == 'train-test' else sendSamplesNonIID
@@ -566,39 +599,43 @@ if experiment != None:
             thread.start()
             threads.append(thread)
         for thread in threads: thread.join() # Wait for all the threads to end
-        if debug: print(f'Batch time: {time.time() - batch_ini_time} seconds)')
-        fl_ini_time = time.time()
-        if enableFL: startFL()
-        if debug: print(f'FL time: {time.time() - fl_ini_time} seconds)')
+        if debug: print(f'[MAIN] Batch time: {round(time.time() - batch_ini_time, 3)}s')
+       
+        if enableFL: 
+            startFL()
+        
         time.sleep(1)
 
-        #if i % test_every_samples == 0:
-        if debug: print(f"[{device.port}] Sending test samples")
-        # To calculate the accuracy on every epoch
-        # sendTestAllDevices()
+        if enableTest:
+            if debug: print(f"[{device.port}] Sending test samples")
+            sendTestAllDevices() # To calculate the accuracy on every epoch
 
-    if debug: print(f'Trained in ({time.time() - train_ini_time} seconds)')
+    if debug:
+        print(f'[MAIN] Training completed in {time.time() - train_ini_time}s')
 
     for deviceIndex, device in enumerate(devices):
-        print(f"[{device.port}] Training loss total: {sum(training_errors_map[deviceIndex])}")
-        print(f"[{device.port}] Training loss mean: {sum(training_errors_map[deviceIndex])/len(training_errors_map[deviceIndex])}")
-        print(f"[{device.port}] Training accuracy: {sum(successes_map[deviceIndex].queue)/len(successes_map[deviceIndex].queue)}")
+        None
+        #print(f"[{device.port}] Training loss total: {sum(training_errors_map[deviceIndex])}")
+        #print(f"[{device.port}] Training loss mean: {sum(training_errors_map[deviceIndex])/len(training_errors_map[deviceIndex])}")
+        #print(f"[{device.port}] Training accuracy: {sum(successes_map[deviceIndex].queue)/len(successes_map[deviceIndex].queue)}")
+        #print(f"[{device.port}] Min weight progress: {min_weights_map[deviceIndex]}")
+        #print(f"[{device.port}] Max weight progress: {max_weights_map[deviceIndex]}")
 
-sendTestAllDevices()
+if enableTest: sendTestAllDevices()
 
 if experiment == 'train-test': 
-    # None
     sendTestAllDevices()
 
 
-print(f"Training accuracies map: {training_accuracy_map}")
-print(f"Training errors map: {training_errors_map}")
-print(f"Testing accuracies map: {test_accuracies_map}")
-print(f"Testing errors map: {test_errors_map}")
+# print(f"[MAIN] Training accuracies map: {training_accuracy_map}")
+# print(f"[MAIN] Training errors map: {training_errors_map}")
+if enableTest:
+    print(f"[MAIN] Testing accuracies map: {test_accuracies_map}")
+    print(f"[MAIN] Testing errors map: {test_errors_map}")
+#print(f"Min weight progress: {min_w_progress}")
+#print(f"Max weight progress: {max_w_progress}")
 
 
-
-# plot_mse_graph()
 
 plt.ylim(bottom=0, top=1)
 plt.xlim(left=0)
@@ -608,9 +645,11 @@ for device_index, device in enumerate(devices):
   plt.plot(test_accuracies_map[device_index], label=f"Device {device_index}")
 
 if experiment != None:
-    # figname = f"plots/BS{batch_size}-LR{learningRate}-M{momentum}-HL{size_hidden_nodes}-TT{train_time}-{experiment}.png"
     figname = f"plots/{len(devices)}-{scaledWeightsBytes if mixedPrecision else 'no'}.png"
     plt.savefig(figname, format='png')
     print(f"Generated {figname}")
 
 # plt.show()
+
+
+time.sleep(10)
